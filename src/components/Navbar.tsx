@@ -35,9 +35,7 @@ export default function Navbar() {
           <Link 
             href="/" 
             className="flex items-center space-x-2 group"
-            onClick={(e) => {
-              e.preventDefault()
-              window.location.href = '/'
+            onClick={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
           >

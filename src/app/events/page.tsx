@@ -91,10 +91,6 @@ export default function EventsPage() {
   }
 
   const handleRegisterClick = (event: Event) => {
-    if (!user) {
-      router.push('/login')
-      return
-    }
     setSelectedEvent(event)
     setShowRegistrationForm(true)
   }
@@ -276,6 +272,8 @@ function RegistrationModal({
 }) {
   const { user } = useAuth()
   const [formData, setFormData] = useState({
+    name: user?.displayName || '',
+    email: user?.email || '',
     phone: '',
     college: '',
     department: '',
@@ -299,7 +297,7 @@ function RegistrationModal({
     setError('')
 
     // Validation
-    if (!formData.phone || !formData.college || !formData.department || !formData.year) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.college || !formData.department || !formData.year) {
       setError('Please fill in all required fields')
       return
     }
@@ -382,26 +380,36 @@ function RegistrationModal({
 
             <form onSubmit={handleSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Your Name
+                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+                  Your Name <span className="text-tech-accent">*</span>
                 </label>
                 <input
                   type="text"
-                  value={user?.displayName || ''}
-                  disabled
-                  className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-gray-400"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  disabled={!!user}
+                  placeholder="Enter your full name"
+                  className="w-full px-4 py-3 bg-tech-dark border border-gray-700 rounded-lg text-white focus:border-tech-accent focus:ring-1 focus:ring-tech-accent outline-none transition placeholder-gray-500 disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Email
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+                  Email <span className="text-tech-accent">*</span>
                 </label>
                 <input
                   type="email"
-                  value={user?.email || ''}
-                  disabled
-                  className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-gray-400"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  disabled={!!user}
+                  placeholder="your.email@example.com"
+                  className="w-full px-4 py-3 bg-tech-dark border border-gray-700 rounded-lg text-white focus:border-tech-accent focus:ring-1 focus:ring-tech-accent outline-none transition placeholder-gray-500 disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
 
