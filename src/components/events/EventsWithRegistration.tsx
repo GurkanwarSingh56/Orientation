@@ -49,10 +49,6 @@ export default function EventsWithRegistration() {
   ]
 
   const handleRegisterClick = (event: Event) => {
-    if (!user) {
-      alert('Please login to register for events')
-      return
-    }
     setSelectedEvent(event)
   }
 
@@ -93,7 +89,7 @@ export default function EventsWithRegistration() {
                   onClick={() => handleRegisterClick(event)}
                   className="w-full py-2 px-4 bg-tech-accent text-tech-dark rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-300"
                 >
-                  {user ? 'Register Now' : 'Login to Register'}
+                  Register Now
                 </button>
               </div>
             ))}

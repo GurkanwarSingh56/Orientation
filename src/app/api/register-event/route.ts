@@ -1,43 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { saveEventRegistration } from '@/lib/google-sheets'
 import { getUserProfile } from '@/lib/user-utils'
-import { addDoc, collection, serverTimestamp, query, where, getDocs } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { adminDb } from '@/lib/firebase-admin'
+import { FieldValue } from 'firebase-admin/firestore'
 
 export async function POST(request: NextRequest) {
   try {
+    // Check if Firebase Admin is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { error: 'Server configuration error. Please contact administrator.' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
-    const { eventId, eventName, userId, phone } = body
+    const { eventId, eventName, userId, name, email, phone, college, department, year, studentId: rollNumber, whyJoin } = body
 
     // Validate required fields
-    if (!eventId || !eventName || !userId) {
+    if (!eventId || !eventName || !name || !email || !phone || !college || !department || !year) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Get user profile from Firestore
-    const userProfile = await getUserProfile(userId)
-    
-    if (!userProfile) {
-      return NextResponse.json(
-        { error: 'User profile not found' },
-        { status: 404 }
-      )
-    }
-
-    // Check if user is already registered for this event
-    const existingRegistrationQuery = query(
-      collection(db, 'registrations'),
-      where('eventId', '==', eventId),
-      where('studentId', '==', userId)
-    )
-    const existingRegistrations = await getDocs(existingRegistrationQuery)
+    // Check if email is already registered for this event
+    const existingRegistrations = await adminDb
+      .collection('registrations')
+      .where('eventId', '==', eventId)
+      .where('studentEmail', '==', email.toLowerCase())
+      .get()
     
     if (!existingRegistrations.empty) {
       return NextResponse.json(
-        { error: 'You are already registered for this event' },
+        { error: 'This email is already registered for this event' },
         { status: 400 }
       )
     }
@@ -45,19 +42,23 @@ export async function POST(request: NextRequest) {
     const registrationData = {
       eventId,
       eventName,
-      studentName: userProfile.displayName,
-      studentEmail: userProfile.email,
-      studentId: userProfile.uid,
-      department: userProfile.department || 'N/A',
-      year: userProfile.year || 0,
-      phone: phone || userProfile.phone || '',
+      studentName: name,
+      studentEmail: email.toLowerCase(),
+      studentId: userId || email.toLowerCase(), // Use userId if logged in, otherwise use email
+      college: college,
+      department: department,
+      year: year,
+      rollNumber: rollNumber || '',
+      phone: phone,
+      whyJoin: whyJoin || '',
       timestamp: new Date(),
+      registeredViaAuth: !!userId,
     }
 
     // Save to Firestore
-    await addDoc(collection(db, 'registrations'), {
+    await adminDb.collection('registrations').add({
       ...registrationData,
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     })
 
     // Save to Google Sheets (if configured)

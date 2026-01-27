@@ -18,6 +18,8 @@ export default function EventRegistrationForm({
 }: EventRegistrationFormProps) {
   const { user } = useAuth()
   const [formData, setFormData] = useState({
+    name: user?.displayName || '',
+    email: user?.email || '',
     phone: '',
     college: '',
     department: '',
@@ -41,7 +43,7 @@ export default function EventRegistrationForm({
     setError('')
 
     // Validation
-    if (!formData.phone || !formData.college || !formData.department || !formData.year) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.college || !formData.department || !formData.year) {
       setError('Please fill in all required fields')
       return
     }
@@ -106,26 +108,36 @@ export default function EventRegistrationForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Your Name
+          <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+            Your Name <span className="text-tech-accent">*</span>
           </label>
           <input
+            id="name"
+            name="name"
             type="text"
-            value={user?.displayName || ''}
-            disabled
-            className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-gray-400"
+            value={formData.name}
+            onChange={handleChange}
+            required
+            disabled={!!user}
+            className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-tech-accent transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+            placeholder="Enter your full name"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email Address
+          <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+            Email Address <span className="text-tech-accent">*</span>
           </label>
           <input
+            id="email"
+            name="email"
             type="email"
-            value={user?.email || ''}
-            disabled
-            className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-gray-400"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            disabled={!!user}
+            className="w-full px-4 py-3 bg-tech-dark border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-tech-accent transition-colors disabled:text-gray-400 disabled:cursor-not-allowed"
+            placeholder="your.email@example.com"
           />
         </div>
 

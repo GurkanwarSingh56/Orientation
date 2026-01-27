@@ -1,6 +1,5 @@
 import Navbar from '@/components/Navbar'
 import Hero from '@/components/Hero'
-import Stats from '@/components/Stats'
 import About from '@/components/About'
 import Features from '@/components/Features'
 import Events from '@/components/Events'
@@ -12,7 +11,6 @@ export default function Home() {
     <main className="bg-tech-dark min-h-screen">
       <Navbar />
       <Hero />
-      <Stats />
       <About />
       <Features />
       <Events />
