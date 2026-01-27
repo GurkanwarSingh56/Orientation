@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Search, Calendar, Users as UsersIcon, Mail, Phone, BookOpen, GraduationCap } from 'lucide-react'
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore'
+import { Download, Search, Calendar, Users as UsersIcon, Mail, Phone, BookOpen, GraduationCap, Trash2 } from 'lucide-react'
+import { collection, getDocs, query, orderBy, where, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
 interface Registration {
@@ -31,6 +31,7 @@ export default function AdminParticipantsPage() {
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedEvent, setSelectedEvent] = useState<string>('all')
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -130,6 +131,29 @@ export default function AdminParticipantsPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const handleDelete = async (registrationId: string, participantName: string) => {
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the registration for ${participantName}? This action cannot be undone.`
+    )
+    
+    if (!confirmDelete) return
+
+    setDeleteLoading(registrationId)
+    try {
+      await deleteDoc(doc(db, 'registrations', registrationId))
+      
+      // Update local state
+      setRegistrations(prev => prev.filter(reg => reg.id !== registrationId))
+      
+      alert('Participant deleted successfully')
+    } catch (err: any) {
+      console.error('Error deleting participant:', err)
+      alert('Failed to delete participant. Please try again.')
+    } finally {
+      setDeleteLoading(null)
+    }
   }
 
   // Group registrations by event
@@ -252,7 +276,12 @@ export default function AdminParticipantsPage() {
 
                 <div className="space-y-3">
                   {registrations.map((reg) => (
-                    <ParticipantCard key={reg.id} registration={reg} />
+                    <ParticipantCard 
+                      key={reg.id} 
+                      registration={reg} 
+                      onDelete={handleDelete}
+                      deleteLoading={deleteLoading}
+                    />
                   ))}
                 </div>
               </div>
@@ -263,7 +292,12 @@ export default function AdminParticipantsPage() {
               <h3 className="text-lg font-bold text-white mb-4">Participants</h3>
               <div className="space-y-3">
                 {filteredRegistrations.map((reg) => (
-                  <ParticipantCard key={reg.id} registration={reg} />
+                  <ParticipantCard 
+                    key={reg.id} 
+                    registration={reg} 
+                    onDelete={handleDelete}
+                    deleteLoading={deleteLoading}
+                  />
                 ))}
               </div>
             </div>
@@ -274,50 +308,72 @@ export default function AdminParticipantsPage() {
   )
 }
 
-function ParticipantCard({ registration }: { registration: Registration }) {
+function ParticipantCard({ 
+  registration, 
+  onDelete, 
+  deleteLoading 
+}: { 
+  registration: Registration
+  onDelete: (id: string, name: string) => void
+  deleteLoading: string | null
+}) {
+  const isDeleting = deleteLoading === registration.id
+
   return (
     <div className="bg-tech-dark border border-gray-700 rounded-lg p-4 hover:border-tech-accent/50 transition-all">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Name */}
-        <div>
-          <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
-            <UsersIcon className="w-3 h-3" />
-            <span>Name</span>
+      <div className="flex items-start justify-between gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
+          {/* Name */}
+          <div>
+            <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
+              <UsersIcon className="w-3 h-3" />
+              <span>Name</span>
+            </div>
+            <p className="text-white font-medium">{registration.studentName}</p>
           </div>
-          <p className="text-white font-medium">{registration.studentName}</p>
+
+          {/* Email */}
+          <div>
+            <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
+              <Mail className="w-3 h-3" />
+              <span>Email</span>
+            </div>
+            <p className="text-white text-sm break-all">{registration.studentEmail}</p>
+          </div>
+
+          {/* Department */}
+          <div>
+            <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
+              <BookOpen className="w-3 h-3" />
+              <span>Department</span>
+            </div>
+            <p className="text-white">{registration.department}</p>
+          </div>
+
+          {/* Year & Phone */}
+          <div>
+            <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
+              <GraduationCap className="w-3 h-3" />
+              <span>Year / Phone</span>
+            </div>
+            <p className="text-white">
+              Year {registration.year}
+              {registration.phone && (
+                <span className="text-gray-400 text-sm block">{registration.phone}</span>
+              )}
+            </p>
+          </div>
         </div>
 
-        {/* Email */}
-        <div>
-          <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
-            <Mail className="w-3 h-3" />
-            <span>Email</span>
-          </div>
-          <p className="text-white text-sm">{registration.studentEmail}</p>
-        </div>
-
-        {/* Department */}
-        <div>
-          <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
-            <BookOpen className="w-3 h-3" />
-            <span>Department</span>
-          </div>
-          <p className="text-white">{registration.department}</p>
-        </div>
-
-        {/* Year & Phone */}
-        <div>
-          <div className="flex items-center space-x-2 text-gray-400 text-xs mb-1">
-            <GraduationCap className="w-3 h-3" />
-            <span>Year / Phone</span>
-          </div>
-          <p className="text-white">
-            Year {registration.year}
-            {registration.phone && (
-              <span className="text-gray-400 text-sm block">{registration.phone}</span>
-            )}
-          </p>
-        </div>
+        {/* Delete Button */}
+        <button
+          onClick={() => onDelete(registration.id, registration.studentName)}
+          disabled={isDeleting}
+          className="flex-shrink-0 p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Delete participant"
+        >
+          <Trash2 className={`w-5 h-5 ${isDeleting ? 'animate-pulse' : ''}`} />
+        </button>
       </div>
 
       {/* Registration Date */}
