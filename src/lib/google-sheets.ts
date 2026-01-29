@@ -8,10 +8,34 @@ import { google } from 'googleapis'
 // Initialize Google Sheets API
 function getGoogleSheetsClient() {
   try {
+    // Check if credentials are available
+    const clientEmail = process.env.GOOGLE_SHEETS_CLIENT_EMAIL
+    const privateKeyRaw = process.env.GOOGLE_SHEETS_PRIVATE_KEY
+
+    if (!clientEmail || !privateKeyRaw) {
+      throw new Error('Google Sheets credentials not configured')
+    }
+
+    // Handle private key formatting - support both formats
+    let privateKey = privateKeyRaw
+    
+    // If the key doesn't start with "-----BEGIN", it might be base64 encoded
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+      try {
+        privateKey = Buffer.from(privateKey, 'base64').toString('utf8')
+      } catch (e) {
+        // If base64 decode fails, try standard replacement
+        privateKey = privateKey.replace(/\\n/g, '\n')
+      }
+    } else {
+      // Standard newline replacement for escaped keys
+      privateKey = privateKey.replace(/\\n/g, '\n')
+    }
+
     const auth = new google.auth.GoogleAuth({
       credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: clientEmail,
+        private_key: privateKey,
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     })
@@ -59,15 +83,24 @@ export async function saveEventRegistration(data: {
   studentName: string
   studentEmail: string
   studentId: string
+  college?: string
   department: string
   year: number
   phone?: string
+  rollNumber?: string
   timestamp: Date
 }) {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID
     if (!spreadsheetId) {
-      throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID not configured')
+      console.warn('GOOGLE_SHEETS_SPREADSHEET_ID not configured, skipping Google Sheets save')
+      return { success: false, skipped: true }
+    }
+
+    // Check if credentials are available
+    if (!process.env.GOOGLE_SHEETS_CLIENT_EMAIL || !process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
+      console.warn('Google Sheets credentials not configured, skipping save')
+      return { success: false, skipped: true }
     }
 
     // Format data for sheet
@@ -78,17 +111,20 @@ export async function saveEventRegistration(data: {
       data.studentName,
       data.studentEmail,
       data.studentId,
+      data.college || 'N/A',
       data.department,
       data.year.toString(),
+      data.rollNumber || 'N/A',
       data.phone || 'N/A',
     ]
 
     // Append to sheet (Sheet1 by default)
-    await appendToSheet(spreadsheetId, 'Sheet1!A:I', [row])
+    await appendToSheet(spreadsheetId, 'Sheet1!A:K', [row])
 
     return { success: true }
   } catch (error) {
-    console.error('Error saving event registration:', error)
+    console.error('Error saving event registration to Google Sheets:', error)
+    // Re-throw to let the caller decide how to handle
     throw error
   }
 }

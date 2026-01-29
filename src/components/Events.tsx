@@ -119,7 +119,9 @@ export default function Events() {
                       <h4 className="text-xl font-bold text-white mb-3">{event.name}</h4>
                       <p className="text-gray-300 mb-4 leading-relaxed line-clamp-3">{event.description}</p>
                       <a
-                        href="/events"
+                        href="https://docs.google.com/forms/d/e/1FAIpQLSfs__fYZoaMAVqv-Io1bwobVGle5nC9FSXEzN6rRS4rpyer0g/viewform"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="block w-full py-2 px-4 bg-tech-accent/10 text-tech-accent rounded-lg font-semibold hover:bg-tech-accent hover:text-tech-dark transition-all duration-300 text-center"
                       >
                         Register Now

@@ -85,12 +85,14 @@ export default function EventsWithRegistration() {
                 </div>
                 <h4 className="text-xl font-bold text-white mb-3">{event.title}</h4>
                 <p className="text-gray-300 mb-4 leading-relaxed">{event.description}</p>
-                <button
-                  onClick={() => handleRegisterClick(event)}
-                  className="w-full py-2 px-4 bg-tech-accent text-tech-dark rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-300"
+                <a
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSfs__fYZoaMAVqv-Io1bwobVGle5nC9FSXEzN6rRS4rpyer0g/viewform"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center w-full py-2 px-4 bg-tech-accent text-tech-dark rounded-lg font-semibold hover:bg-opacity-90 transition-all duration-300"
                 >
                   Register Now
-                </button>
+                </a>
               </div>
             ))}
           </div>

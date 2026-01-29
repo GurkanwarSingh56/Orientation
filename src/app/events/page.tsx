@@ -230,13 +230,23 @@ export default function EventsPage() {
                     </div>
 
                     {/* Register Button */}
-                    <button
-                      onClick={() => handleRegisterClick(event)}
-                      disabled={!canRegister}
-                      className="w-full bg-tech-accent text-tech-dark font-semibold py-3 rounded-lg hover:bg-tech-accent/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isRegistered ? 'Already Registered' : isFull ? 'Event Full' : isClosed ? 'Registration Closed' : 'Register Now'}
-                    </button>
+                    {canRegister ? (
+                      <a
+                        href="https://docs.google.com/forms/d/e/1FAIpQLSfs__fYZoaMAVqv-Io1bwobVGle5nC9FSXEzN6rRS4rpyer0g/viewform"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-center w-full bg-tech-accent text-tech-dark font-semibold py-3 rounded-lg hover:bg-tech-accent/90 transition"
+                      >
+                        Register Now
+                      </a>
+                    ) : (
+                      <button
+                        disabled
+                        className="w-full bg-tech-accent text-tech-dark font-semibold py-3 rounded-lg transition opacity-50 cursor-not-allowed"
+                      >
+                        {isRegistered ? 'Already Registered' : isFull ? 'Event Full' : isClosed ? 'Registration Closed' : 'Register Now'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )
