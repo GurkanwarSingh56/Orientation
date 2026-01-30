@@ -19,7 +19,7 @@ export default function Navbar() {
     { name: 'Home', href: '#home' },
     { name: 'About', href: '#about' },
     { name: 'Features', href: '#features' },
-    { name: 'Events', href: '/events' },
+    { name: 'Events', href: 'https://forms.gle/C7e1NnsTvKtwvKBv5', external: true },
     { name: 'Team', href: '#team' },
   ]
 
@@ -54,6 +54,16 @@ export default function Navbar() {
                 <a
                   key={item.name}
                   href={item.href}
+                  className="text-gray-300 hover:text-tech-accent transition-colors duration-300 font-medium"
+                >
+                  {item.name}
+                </a>
+              ) : item.external ? (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-gray-300 hover:text-tech-accent transition-colors duration-300 font-medium"
                 >
                   {item.name}
@@ -109,6 +119,17 @@ export default function Navbar() {
                 <a
                   key={item.name}
                   href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-gray-300 hover:text-tech-accent transition-colors duration-300 font-medium"
+                >
+                  {item.name}
+                </a>
+              ) : item.external ? (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="text-gray-300 hover:text-tech-accent transition-colors duration-300 font-medium"
                 >
