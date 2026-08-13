@@ -1,163 +1,153 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useAuth } from '@/context/AuthContext'
-import { logOut } from '@/lib/firebase-auth'
-import { useRouter } from 'next/navigation'
-import { AlertCircle } from 'lucide-react'
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
+import { User, MapPin, Bookmark, Award, Calendar, FolderGit2, Sparkles, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ROADMAPS_DATA } from '@/lib/data/roadmaps-data';
+import { EVENTS_DATA } from '@/lib/data/events-data';
 
-export default function DashboardPage() {
-  const { user, role, isAdmin, roleError, retryFetchRole } = useAuth()
-  const router = useRouter()
-  const [loggingOut, setLoggingOut] = useState(false)
-  const [logoutError, setLogoutError] = useState('')
-
-  const handleLogout = async () => {
-    setLoggingOut(true)
-    setLogoutError('')
-    try {
-      await logOut()
-      router.push('/login')
-    } catch (error: any) {
-      console.error('Error logging out:', error)
-      const errorMessage = error.code === 'network-request-failed'
-        ? 'Network error. Please check your connection and try again.'
-        : 'Failed to logout. Please try again.'
-      setLogoutError(errorMessage)
-    } finally {
-      setLoggingOut(false)
-    }
-  }
+export default function StudentDashboardPage() {
+  const { user, userProfile } = useAuth();
 
   return (
-    <div className="min-h-screen bg-tech-dark">
-      {/* Navigation */}
-      <nav className="bg-tech-light border-b border-tech-accent/20">
+    <main className="bg-[#0B0F19] min-h-screen text-white pt-24">
+      <Navbar />
+
+      {/* Header Banner */}
+      <section className="py-10 bg-gradient-to-b from-[#0F172A] to-[#0B0F19] border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-tech-accent rounded-lg flex items-center justify-center">
-                <span className="text-tech-dark font-bold text-lg">T</span>
-              </div>
-              <span className="text-xl font-bold text-white">
-                Tech<span className="text-tech-accent">novate</span>
-              </span>
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-4">
-              {isAdmin && (
-                <a
-                  href="/admin"
-                  className="px-4 py-2 bg-tech-accent/10 text-tech-accent rounded-lg hover:bg-tech-accent/20 transition-colors"
-                >
-                  Admin Panel
-                </a>
-              )}
-              <button
-                onClick={handleLogout}
-                disabled={loggingOut}
-                className="px-4 py-2 bg-tech-accent text-tech-dark font-semibold rounded-lg hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loggingOut ? 'Logging out...' : 'Logout'}
-              </button>
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-2xl font-extrabold text-white shadow-lg shadow-cyan-500/20">
+                {userProfile?.name ? userProfile.name[0].toUpperCase() : user?.email ? user.email[0].toUpperCase() : 'S'}
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+                  Welcome, {userProfile?.name || 'Student Innovator'}!
+                </h1>
+                <p className="text-xs text-cyan-300 font-mono mt-0.5">
+                  {userProfile?.branch || 'Electrical Eng'} • {userProfile?.year || '1st Year'} • Technovate Member
+                </p>
+              </div>
             </div>
-          </div>
-        </div>
-      </nav>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Role Error Banner */}
-        {roleError && (
-          <div className="bg-yellow-500/10 border border-yellow-500 text-yellow-500 px-4 py-3 rounded-lg mb-6 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5" />
-              <span>{roleError}</span>
-            </div>
-            <button
-              onClick={retryFetchRole}
-              className="ml-4 px-4 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 rounded transition text-sm font-medium"
+            <Link
+              href="/tech-hub"
+              className="px-4 py-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center space-x-2 shrink-0 hover:bg-cyan-500/30"
             >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Logout Error Banner */}
-        {logoutError && (
-          <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded-lg mb-6">
-            {logoutError}
-          </div>
-        )}
-
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Welcome, {user?.displayName || 'Student'}!
-          </h1>
-          <p className="text-gray-400">
-            Role: <span className="text-tech-accent capitalize">{role}</span>
-          </p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-tech-light rounded-xl border border-tech-accent/20 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-400">Events Attended</h3>
-              <svg className="w-8 h-8 text-tech-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <p className="text-3xl font-bold text-white">12</p>
-          </div>
-
-          <div className="bg-tech-light rounded-xl border border-tech-accent/20 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-400">Projects</h3>
-              <svg className="w-8 h-8 text-tech-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </div>
-            <p className="text-3xl font-bold text-white">5</p>
-          </div>
-
-          <div className="bg-tech-light rounded-xl border border-tech-accent/20 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-gray-400">Certificates</h3>
-              <svg className="w-8 h-8 text-tech-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-            </div>
-            <p className="text-3xl font-bold text-white">8</p>
+              <Sparkles className="w-4 h-4 text-pink-400" />
+              <span>Explore Tech Hub</span>
+            </Link>
           </div>
         </div>
+      </section>
 
-        {/* User Info */}
-        <div className="bg-tech-light rounded-xl border border-tech-accent/20 p-6">
-          <h2 className="text-2xl font-bold text-white mb-6">Profile Information</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Email</p>
-              <p className="text-white">{user?.email}</p>
+      {/* Workspace Dashboard Body */}
+      <section className="py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+              <p className="text-xs text-gray-400 font-mono">Roadmaps Active</p>
+              <p className="text-2xl font-extrabold text-cyan-400 mt-1">2 Tracks</p>
             </div>
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Role</p>
-              <p className="text-white capitalize">{role}</p>
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+              <p className="text-xs text-gray-400 font-mono">Bookmarked Topics</p>
+              <p className="text-2xl font-extrabold text-purple-400 mt-1">5 Guides</p>
             </div>
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Email Verified</p>
-              <p className="text-white">{user?.emailVerified ? 'Yes' : 'No'}</p>
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+              <p className="text-xs text-gray-400 font-mono">Event RSVPs</p>
+              <p className="text-2xl font-extrabold text-emerald-400 mt-1">1 Confirmed</p>
             </div>
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Member Since</p>
-              <p className="text-white">
-                {user?.metadata.creationTime
-                  ? new Date(user.metadata.creationTime).toLocaleDateString()
-                  : 'N/A'}
-              </p>
+            <div className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+              <p className="text-xs text-gray-400 font-mono">Reputation Points</p>
+              <p className="text-2xl font-extrabold text-pink-400 mt-1">120 PTS</p>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* Active Learning Roadmaps */}
+            <div className="lg:col-span-8 space-y-4">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-cyan-400" />
+                <span>Your Active Learning Roadmaps</span>
+              </h2>
+
+              {ROADMAPS_DATA.slice(0, 2).map((rm) => (
+                <div key={rm.id} className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono uppercase font-bold px-2.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300">
+                      {rm.badge}
+                    </span>
+                    <span className="text-xs font-bold text-cyan-400 font-mono">40% Complete</span>
+                  </div>
+
+                  <h3 className="text-lg font-bold text-white">{rm.title}</h3>
+                  <p className="text-xs text-gray-300 mt-1 mb-4">{rm.description}</p>
+
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+                    <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-600 w-[40%]" />
+                  </div>
+
+                  <Link
+                    href={`/roadmaps/${rm.slug}`}
+                    className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:underline"
+                  >
+                    <span>Resume Learning Track</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+
+            {/* Event Ticket & Badges */}
+            <div className="lg:col-span-4 space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-emerald-400" />
+                  <span>Confirmed Event Ticket</span>
+                </h2>
+
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 to-teal-950/40 border border-emerald-500/40">
+                  <span className="text-[10px] font-mono font-bold text-emerald-300 uppercase px-2 py-0.5 rounded bg-emerald-500/20">
+                    Workshop Ticket
+                  </span>
+                  <h3 className="text-sm font-bold text-white mt-2">{EVENTS_DATA[0].title}</h3>
+                  <p className="text-xs text-gray-300 mt-1">{EVENTS_DATA[0].date} @ {EVENTS_DATA[0].time}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{EVENTS_DATA[0].venue}</p>
+                  <div className="mt-4 pt-3 border-t border-white/10 text-center font-mono text-[11px] text-emerald-400">
+                    Ticket Code: #TECH-2026-8942
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Award className="w-5 h-5 text-pink-400" />
+                  <span>Technovate Badges</span>
+                </h2>
+
+                <div className="flex flex-wrap gap-2">
+                  <span className="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-pink-400" /> Pioneer Member
+                  </span>
+                  <span className="px-3 py-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" /> Web Dev Explorer
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
         </div>
-      </div>
-    </div>
-  )
+      </section>
+
+      <Footer />
+    </main>
+  );
 }

@@ -1,212 +1,194 @@
-'use client'
+'use client';
 
-import { useAuth } from '@/context/AuthContext'
-import { Calendar, Users, FolderKanban, TrendingUp } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import Link from 'next/link'
+import { useState } from 'react';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { BookOpen, CheckCircle2, ShieldAlert, PlusCircle, Users, Calendar, FolderGit2, Sparkles, X } from 'lucide-react';
+import { TECH_CATEGORIES } from '@/lib/data/tech-hub-data';
+import { PROJECTS_DATA } from '@/lib/data/projects-data';
+import { EVENTS_DATA } from '@/lib/data/events-data';
 
-interface ActivityItem {
-  id: string
-  type: 'registration' | 'event' | 'member'
-  title: string
-  description: string
-  timestamp: any
-}
+export default function AdminDashboardPage() {
+  const [activeTab, setActiveTab] = useState<'content' | 'projects' | 'events'>('content');
+  const [isSuccessMsg, setIsSuccessMsg] = useState('');
 
-export default function AdminPage() {
-  const { user } = useAuth()
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    activeEvents: 0,
-    upcomingEvents: 0,
-    totalRegistrations: 0,
-    weekRegistrations: 0
-  })
-  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    setLoading(true)
-    try {
-      // Fetch total members
-      const usersSnapshot = await getDocs(collection(db, 'users'))
-      const totalMembers = usersSnapshot.size
-
-      // Fetch events
-      const eventsSnapshot = await getDocs(collection(db, 'events'))
-      const events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      
-      const now = new Date()
-      const activeEvents = events.filter((e: any) => e.registrationOpen).length
-      const upcomingEvents = events.filter((e: any) => {
-        const eventDate = e.date?.toDate ? e.date.toDate() : new Date(e.date)
-        return eventDate > now
-      }).length
-
-      // Fetch registrations
-      const registrationsSnapshot = await getDocs(collection(db, 'registrations'))
-      const totalRegistrations = registrationsSnapshot.size
-      
-      // Count registrations from this week
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      const weekRegistrations = registrationsSnapshot.docs.filter(doc => {
-        const data = doc.data()
-        const regDate = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
-        return regDate >= weekAgo
-      }).length
-
-      // Build recent activity
-      const activities: ActivityItem[] = []
-      
-      // Recent registrations (last 5)
-      const recentRegs = registrationsSnapshot.docs
-        .sort((a, b) => {
-          const aDate = a.data().createdAt?.toDate?.() || new Date(0)
-          const bDate = b.data().createdAt?.toDate?.() || new Date(0)
-          return bDate.getTime() - aDate.getTime()
-        })
-        .slice(0, 5)
-      
-      for (const doc of recentRegs) {
-        const data = doc.data()
-        activities.push({
-          id: doc.id,
-          type: 'registration',
-          title: `New registration for ${data.eventName || 'event'}`,
-          description: `${data.studentName || 'Someone'} registered`,
-          timestamp: data.createdAt
-        })
-      }
-
-      setStats({
-        totalMembers,
-        activeEvents,
-        upcomingEvents,
-        totalRegistrations,
-        weekRegistrations
-      })
-      setRecentActivity(activities.slice(0, 3))
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const getTimeAgo = (timestamp: any) => {
-    if (!timestamp) return 'Recently'
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-    
-    if (seconds < 60) return 'Just now'
-    if (seconds < 3600) return `${Math.floor(seconds / 60)} mins ago`
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`
-    return `${Math.floor(seconds / 86400)} days ago`
-  }
-
-  const statsDisplay = [
-    { label: 'Total Members', value: loading ? '...' : stats.totalMembers.toString(), change: '', icon: Users, color: 'text-blue-400' },
-    { label: 'Active Events', value: loading ? '...' : stats.activeEvents.toString(), change: `${stats.upcomingEvents} upcoming`, icon: Calendar, color: 'text-green-400' },
-    { label: 'Projects', value: '0', change: 'Coming soon', icon: FolderKanban, color: 'text-purple-400' },
-    { label: 'Registrations', value: loading ? '...' : stats.totalRegistrations.toString(), change: `${stats.weekRegistrations} this week`, icon: TrendingUp, color: 'text-tech-accent' },
-  ]
+  const triggerSuccess = (msg: string) => {
+    setIsSuccessMsg(msg);
+    setTimeout(() => setIsSuccessMsg(''), 3000);
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-tech-light rounded-lg border border-tech-accent/20 p-6">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Welcome back, {user?.displayName || 'Admin'}!
-        </h2>
-        <p className="text-gray-400">
-          Manage your club events, participants, and more from this dashboard.
-        </p>
-      </div>
+    <main className="bg-[#0B0F19] min-h-screen text-white pt-24">
+      <Navbar />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsDisplay.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <div
-              key={stat.label}
-              className="bg-tech-light rounded-lg border border-tech-accent/20 p-6 hover:border-tech-accent/50 transition-all"
+      {/* Header */}
+      <section className="py-10 bg-gradient-to-b from-[#1E1B4B] to-[#0B0F19] border-b border-purple-500/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center space-x-2 text-purple-400 font-mono text-xs uppercase tracking-widest mb-2">
+            <BookOpen className="w-4 h-4" />
+            <span>Technovate Executive Management</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white">Admin Control Panel</h1>
+          <p className="text-xs sm:text-sm text-gray-300 max-w-2xl mt-1">
+            Curate technical topics, approve pending student projects, publish events, and moderate community discussions.
+          </p>
+
+          {/* Navigation Tabs */}
+          <div className="mt-8 flex space-x-2 border-b border-white/10 pb-2">
+            <button
+              onClick={() => setActiveTab('content')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'content'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white/5 text-gray-400 hover:text-white'
+              }`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-gray-400 text-sm">{stat.label}</h3>
-                <Icon className={`w-5 h-5 ${stat.color}`} />
-              </div>
-              <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
-              <p className="text-tech-accent text-sm">{stat.change}</p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-tech-light rounded-lg border border-tech-accent/20 p-6">
-        <h3 className="text-xl font-bold text-white mb-4">Recent Activity</h3>
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between py-3 border-b border-gray-700 animate-pulse">
-                <div className="flex-1">
-                  <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-                </div>
-              </div>
-            ))}
+              Content Management ({TECH_CATEGORIES.length} Categories)
+            </button>
+            <button
+              onClick={() => setActiveTab('projects')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'projects'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white/5 text-gray-400 hover:text-white'
+              }`}
+            >
+              Project Approvals ({PROJECTS_DATA.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('events')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'events'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white/5 text-gray-400 hover:text-white'
+              }`}
+            >
+              Event Management ({EVENTS_DATA.length})
+            </button>
           </div>
-        ) : recentActivity.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No recent activity</p>
-        ) : (
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between py-3 border-b border-gray-700 last:border-0">
-                <div>
-                  <p className="text-white font-medium">{activity.title}</p>
-                  <p className="text-gray-400 text-sm">{activity.description}</p>
-                </div>
-                <span className="text-tech-accent text-sm">{getTimeAgo(activity.timestamp)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link href="/admin/events" className="bg-tech-light border border-tech-accent/20 rounded-lg p-6 hover:border-tech-accent transition-all text-left group">
-          <Calendar className="w-8 h-8 text-tech-accent mb-3" />
-          <h3 className="text-white font-semibold mb-2 group-hover:text-tech-accent transition-colors">
-            Create Event
-          </h3>
-          <p className="text-gray-400 text-sm">Add a new event to the calendar</p>
-        </Link>
-
-        <Link href="/admin/participants" className="bg-tech-light border border-tech-accent/20 rounded-lg p-6 hover:border-tech-accent transition-all text-left group">
-          <Users className="w-8 h-8 text-tech-accent mb-3" />
-          <h3 className="text-white font-semibold mb-2 group-hover:text-tech-accent transition-colors">
-            Manage Members
-          </h3>
-          <p className="text-gray-400 text-sm">View and manage club members</p>
-        </Link>
-
-        <div className="bg-tech-light border border-tech-accent/20 rounded-lg p-6 opacity-50 cursor-not-allowed text-left group">
-          <FolderKanban className="w-8 h-8 text-gray-500 mb-3" />
-          <h3 className="text-gray-400 font-semibold mb-2">
-            Add Project
-          </h3>
-          <p className="text-gray-500 text-sm">Coming soon</p>
         </div>
-      </div>
-    </div>
-  )
+      </section>
+
+      {/* Admin Panel Body */}
+      <section className="py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {isSuccessMsg && (
+            <div className="p-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold mb-6 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> {isSuccessMsg}
+              </span>
+              <button onClick={() => setIsSuccessMsg('')}><X className="w-4 h-4" /></button>
+            </div>
+          )}
+
+          {activeTab === 'content' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Curated Tech Categories & Topics</h2>
+                <button
+                  onClick={() => triggerSuccess('Topic editor draft created successfully!')}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" /> Add New Topic Guide
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {TECH_CATEGORIES.map((cat) => (
+                  <div key={cat.id} className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-base font-bold text-cyan-400">{cat.title}</h3>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300">
+                        {cat.topicsCount} Topics
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300 line-clamp-2 mb-3">{cat.description}</p>
+
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => triggerSuccess(`Opened editor for ${cat.title}`)}
+                        className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-gray-200 font-semibold"
+                      >
+                        Edit Domain
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'projects' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-white">Student Project Submissions Queue</h2>
+              <div className="space-y-4">
+                {PROJECTS_DATA.map((proj) => (
+                  <div key={proj.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-purple-500/10 text-purple-300">
+                          {proj.category}
+                        </span>
+                        <span className="text-xs text-gray-400">By {proj.author.name} ({proj.author.branch})</span>
+                      </div>
+                      <h3 className="text-base font-bold text-white">{proj.title}</h3>
+                      <p className="text-xs text-gray-300 mt-1">{proj.tagline}</p>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <button
+                        onClick={() => triggerSuccess(`Project "${proj.title}" approved!`)}
+                        className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold hover:bg-emerald-500/30"
+                      >
+                        Approve & Feature
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'events' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Technovate Events & Workshops</h2>
+                <button
+                  onClick={() => triggerSuccess('New event draft created!')}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold shadow-md flex items-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" /> Create Workshop / Event
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {EVENTS_DATA.map((event) => (
+                  <div key={event.id} className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300">
+                        {event.category}
+                      </span>
+                      <h3 className="text-base font-bold text-white mt-1">{event.title}</h3>
+                      <p className="text-xs text-gray-400">{event.date} • {event.venue}</p>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      <button
+                        onClick={() => triggerSuccess(`Managing RSVPs for ${event.title}`)}
+                        className="px-4 py-2 rounded-xl bg-white/10 text-gray-200 border border-white/15 text-xs font-bold hover:bg-white/15"
+                      >
+                        Manage {event.rsvpCount} RSVPs
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <Footer />
+    </main>
+  );
 }
