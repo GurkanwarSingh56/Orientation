@@ -164,21 +164,12 @@ export default function DomainModal({ isOpen, onClose, domain }: DomainModalProp
 
             <div className="space-y-3">
               <Link
-                href={`/quiz/${domain.quizSlug}`}
-                onClick={onClose}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/20 hover:opacity-95 transition-all group"
-              >
-                <span>Take Individual Quiz</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-
-              <Link
                 href="/live-quiz"
                 onClick={onClose}
-                className="w-full py-3 px-4 rounded-xl bg-white/10 border border-white/10 text-cyan-300 font-bold text-xs flex items-center justify-center space-x-2 hover:bg-white/20 transition-all"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:opacity-95 transition-all group focus:outline-none focus:ring-2 focus:ring-cyan-300"
               >
                 <span>Join Realtime Live Quiz</span>
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
           </div>

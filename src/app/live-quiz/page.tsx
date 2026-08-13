@@ -365,7 +365,22 @@ export default function LiveQuizStudentPage() {
               </div>
             )}
 
-            {/* 4. QUIZ FINISHED VIEW */}
+            {/* 4. PAUSED QUIZ VIEW */}
+            {liveState?.status === 'paused' && (
+              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-amber-500/30 shadow-xl space-y-6 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mx-auto flex items-center justify-center">
+                  <Clock className="w-8 h-8 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-extrabold text-white">QUIZ PAUSED BY HOST</h3>
+                  <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
+                    The host has temporarily paused the quiz. Please wait until the host resumes the session.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 5. QUIZ FINISHED VIEW */}
             {liveState?.status === 'ended' && (
               <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mx-auto flex items-center justify-center">
