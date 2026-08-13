@@ -1,190 +1,194 @@
 'use client';
 
-import { Bot, ShieldAlert, Globe, Code2, Database, Cloud, Rocket, GitBranch, ArrowRight, Sparkles } from 'lucide-react';
+import { Rocket, Bot, GitBranch, MapPin, Globe, Database, Cloud, Sparkles, Clock, ArrowRight, BookOpen } from 'lucide-react';
 
 export interface FeaturedTopicsProps {
   activeCategoryFilter?: string;
 }
 
-export const FEATURED_TOPIC_CARDS = [
-  {
-    id: 'ai-agents',
-    title: 'AI & AI Agents',
-    icon: Bot,
-    topicsCount: 7,
-    difficulty: 'Beginner to Advanced',
-    badgeColor: 'border-cyan-500/40 text-cyan-300 bg-cyan-500/10',
-    summary: 'Explore LLMs, Generative AI, Retrieval-Augmented Generation (RAG), and Autonomous AI Agents that reason and execute tasks using digital tools.',
-    keyTerms: ['LLMs', 'Prompt Engineering', 'RAG Vector Search', 'Tool Calling', 'ReAct Pattern'],
-    popularTopic: 'How AI Agents use tools to write & debug code'
-  },
-  {
-    id: 'cybersecurity',
-    title: 'Cybersecurity',
-    icon: ShieldAlert,
-    topicsCount: 6,
-    difficulty: 'Beginner Friendly',
-    badgeColor: 'border-emerald-500/40 text-emerald-300 bg-emerald-500/10',
-    summary: 'Master ethical hacking, secure authentication, password hashing, network security, and the OWASP Top 10 web vulnerabilities.',
-    keyTerms: ['SQL Injection', 'Cross-Site Scripting (XSS)', 'Encryption', 'OWASP Top 10', 'Cyber Hygiene'],
-    popularTopic: 'Understanding SQL Injection & Parameterized Queries'
-  },
-  {
-    id: 'web-dev',
-    title: 'Web Development',
-    icon: Globe,
-    topicsCount: 8,
-    difficulty: 'All Levels',
-    badgeColor: 'border-violet-500/40 text-violet-300 bg-violet-500/10',
-    summary: 'Build modern responsive websites with HTML5, CSS3, JavaScript ES6+, React, Next.js App Router, REST APIs, and Vercel cloud deployment.',
-    keyTerms: ['HTML/CSS', 'JavaScript ES6+', 'React Components', 'Next.js App Router', 'REST APIs'],
-    popularTopic: 'Zero to Full-Stack Web Development Starter Path'
-  },
-  {
-    id: 'dsa-prep',
-    title: 'DSA & Interview Preparation',
-    icon: Code2,
-    topicsCount: 11,
-    difficulty: 'Intermediate',
-    badgeColor: 'border-amber-500/40 text-amber-300 bg-amber-500/10',
-    summary: 'Master fundamental data structures and algorithmic problem-solving patterns required for technical interviews and off-campus placements.',
-    keyTerms: ['Two Pointers', 'Sliding Window', 'Binary Trees', 'Graphs (BFS/DFS)', 'Dynamic Programming'],
-    popularTopic: 'Two Pointers Technique for Linear O(N) Array Operations'
-  },
-  {
-    id: 'databases',
-    title: 'Databases & Data Architecture',
-    icon: Database,
-    topicsCount: 7,
-    difficulty: 'Beginner Friendly',
-    badgeColor: 'border-purple-500/40 text-purple-300 bg-purple-500/10',
-    summary: 'Learn relational tables (PostgreSQL, MySQL) vs document NoSQL stores (MongoDB, Firestore, Redis), indexing, and schema design.',
-    keyTerms: ['SQL Queries', 'Relational Schema', 'NoSQL JSON', 'ACID Transactions', 'Indexing'],
-    popularTopic: 'SQL vs NoSQL: When to choose Relational or Document Stores'
-  },
-  {
-    id: 'cloud-aws',
-    title: 'Cloud & AWS Architecture',
-    icon: Cloud,
-    topicsCount: 8,
-    difficulty: 'Beginner Friendly',
-    badgeColor: 'border-sky-500/40 text-sky-300 bg-sky-500/10',
-    summary: 'Discover cloud computing fundamentals, AWS EC2 virtual servers, S3 object storage buckets, and serverless Lambda functions.',
-    keyTerms: ['Cloud Computing', 'AWS EC2', 'Amazon S3', 'AWS Lambda', 'Cloud Security'],
-    popularTopic: 'Hosting Assets & Web Applications on AWS Cloud'
-  },
-  {
-    id: 'space-satellites',
-    title: 'Space & Satellites',
-    icon: Rocket,
-    topicsCount: 7,
-    difficulty: 'Curiosity Driven',
-    badgeColor: 'border-pink-500/40 text-pink-300 bg-pink-500/10',
-    summary: 'Explore satellite communications, orbital telemetry, GPS triangulation, Earth observation, and deep space probes like Voyager 1 & 2.',
-    keyTerms: ['Deep Space Network', 'Voyager 1 Telemetry', 'GPS Triangulation', 'Orbital Mechanics'],
-    popularTopic: 'Voyager 1: Transmitting across 24B km at 23 Watts'
-  },
-  {
-    id: 'github-tools',
-    title: 'GitHub & Developer Tools',
-    icon: GitBranch,
-    topicsCount: 8,
-    difficulty: 'Essential Starter',
-    badgeColor: 'border-rose-500/40 text-rose-300 bg-rose-500/10',
-    summary: 'Master Git version control, GitHub collaboration, Pull Requests, Open Source contributions (GSoC), and terminal developer workflows.',
-    keyTerms: ['Git Commit', 'Pull Requests', 'Repository Forking', 'Open Source (GSoC)', 'VS Code'],
-    popularTopic: 'Git Version Control & Making Your First Open Source PR'
-  }
-];
-
 export default function FeaturedTopics({ activeCategoryFilter = 'all' }: FeaturedTopicsProps) {
-  const filteredTopics = FEATURED_TOPIC_CARDS.filter((topic) => {
-    if (activeCategoryFilter === 'all') return true;
-    return topic.id === activeCategoryFilter;
-  });
+  const dominantTopic = {
+    id: 'voyager-1',
+    category: 'Space & Telemetry',
+    title: 'Voyager 1 Deep Space Telemetry',
+    question: 'How is a spacecraft launched in 1977 still communicating with Earth across 24 billion kilometers?',
+    explanation: 'Voyager 1 uses NASA Deep Space Network giant parabolic dishes to capture its 23-Watt radio signal traveling at light speed for ~22.5 hours across interstellar space.',
+    readingTime: '5 min read',
+    difficulty: 'Curiosity Driven',
+    icon: Rocket,
+  };
+
+  const supportingTopics = [
+    {
+      id: 'ai-agents',
+      category: 'AI & Agents',
+      title: 'Autonomous AI Agents',
+      question: 'What makes an AI system capable of taking actions instead of simply generating text?',
+      explanation: 'AI Agents use ReAct tool calling to evaluate state, write code, query databases, and autonomously execute multi-step goals.',
+      readingTime: '6 min read',
+      difficulty: 'Intermediate',
+      icon: Bot,
+    },
+    {
+      id: 'git-commit',
+      category: 'Developer Tools',
+      title: 'Inside Git Commit Objects',
+      question: 'What actually happens when you run git commit?',
+      explanation: 'Git creates a compressed DAG snapshot object containing tree hashes, author timestamps, and parent commit pointer references.',
+      readingTime: '4 min read',
+      difficulty: 'Beginner',
+      icon: GitBranch,
+    },
+    {
+      id: 'gps-triangulation',
+      category: 'Space & Satellites',
+      title: 'Satellite GPS Triangulation',
+      question: 'How can your phone determine where you are anywhere on Earth?',
+      explanation: 'By calculating the microsecond time-of-arrival delay of atomic-clock radio signals from at least 4 orbital GPS satellites.',
+      readingTime: '5 min read',
+      difficulty: 'Beginner',
+      icon: MapPin,
+    },
+    {
+      id: 'web-navigation',
+      category: 'Web Development',
+      title: 'The Lifecycle of a Web Request',
+      question: 'What happens after you type a URL and press Enter in your browser?',
+      explanation: 'DNS lookup resolves IP, TLS handshake establishes encryption, HTTP GET returns HTML, and browser DOM engine renders CSS/JS.',
+      readingTime: '6 min read',
+      difficulty: 'Beginner',
+      icon: Globe,
+    },
+    {
+      id: 'sql-vs-nosql',
+      category: 'Databases',
+      title: 'SQL vs NoSQL Architecture',
+      question: 'Why do different applications use different kinds of databases?',
+      explanation: 'SQL guarantees multi-table ACID transactions, whereas NoSQL document stores offer flexible horizontal scaling for JSON feeds.',
+      readingTime: '5 min read',
+      difficulty: 'Beginner',
+      icon: Database,
+    },
+    {
+      id: 'aws-ec2',
+      category: 'Cloud Computing',
+      title: 'Virtual Servers & AWS EC2',
+      question: 'What does renting a computer in the cloud actually mean?',
+      explanation: 'AWS runs physical hypervisor servers that allocate virtualized CPU cores, RAM, and EBS virtual hard drives on-demand.',
+      readingTime: '4 min read',
+      difficulty: 'Beginner',
+      icon: Cloud,
+    },
+    {
+      id: 'rag-systems',
+      category: 'AI & Systems',
+      title: 'Retrieval-Augmented Generation (RAG)',
+      question: 'How can an AI system use external documents when answering questions?',
+      explanation: 'RAG converts private PDFs into vector embeddings, performs similarity search, and injects relevant context directly into the prompt.',
+      readingTime: '5 min read',
+      difficulty: 'Intermediate',
+      icon: Sparkles,
+    },
+  ];
 
   return (
     <section id="topics" className="py-16 sm:py-20 bg-[#050814] relative border-t border-cyan-500/20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 sm:mb-12 gap-4">
-          <div>
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/5 border border-cyan-500/30 text-cyan-300 text-xs font-mono mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>CURATED KNOWLEDGE ENGINE</span>
-            </div>
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-              Explore Technology Domains
-            </h2>
+        
+        {/* Section Header */}
+        <div className="mb-10 sm:mb-12">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-cyan-500/30 text-cyan-300 text-xs font-mono mb-3">
+            <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+            <span>EDITORIAL EXPLANATIONS</span>
           </div>
-          <p className="text-xs sm:text-sm text-gray-300 max-w-md">
-            Zero-jargon explanations, key terms, and visual breakdowns for 8 core technology categories.
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+            Things Worth Knowing
+          </h2>
+          <p className="text-xs sm:text-sm text-gray-300 mt-2 max-w-xl leading-relaxed">
+            Short explanations of the technology behind the things you use every day.
           </p>
         </div>
 
-        {/* 8 Category Cards Grid - Highly Responsive */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {filteredTopics.map((topic) => {
+        {/* Editorial Layout: Dominant Topic + Supporting Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          {/* Dominant Featured Topic (Voyager 1) */}
+          <div className="lg:col-span-12 p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#131C38] via-[#0E172F] to-[#131C38] border border-pink-500/40 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="max-w-3xl">
+              <div className="flex items-center space-x-3 mb-3">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/40 flex items-center gap-1.5">
+                  <Rocket className="w-3.5 h-3.5 text-pink-400" /> {dominantTopic.category}
+                </span>
+                <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" /> {dominantTopic.readingTime}
+                </span>
+              </div>
+
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
+                {dominantTopic.title}
+              </h3>
+              <p className="text-sm font-semibold text-cyan-300 mb-3 leading-relaxed">
+                "{dominantTopic.question}"
+              </p>
+              <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
+                {dominantTopic.explanation}
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <a
+                href="#today"
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-violet-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-pink-500/20 hover:opacity-90 transition-opacity"
+              >
+                <span>Read Full Story</span>
+                <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+
+          {/* 7 Supporting Editorial Topic Cards */}
+          {supportingTopics.map((topic) => {
             const Icon = topic.icon;
             return (
               <div
                 key={topic.id}
-                className="group p-5 rounded-2xl bg-[#0B1124] border border-white/10 hover:border-cyan-500/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:shadow-cyan-500/10 flex flex-col justify-between"
+                className="lg:col-span-4 p-5 rounded-2xl bg-[#0B1124] border border-white/10 hover:border-cyan-500/40 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between group"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400 group-hover:scale-105 transition-transform">
-                      <Icon className="w-5 h-5 text-cyan-400" />
-                    </div>
-                    <span className={`text-[10px] font-mono font-bold uppercase px-2.5 py-1 rounded-full border ${topic.badgeColor}`}>
-                      {topic.topicsCount} Topics
+                    <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                      {topic.category}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-cyan-400" /> {topic.readingTime}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">
+                  <h4 className="text-base font-bold text-white mb-1.5 group-hover:text-cyan-300 transition-colors">
                     {topic.title}
-                  </h3>
-                  
-                  <span className="text-[10px] font-mono text-gray-400 block mb-3">
-                    Level: {topic.difficulty}
-                  </span>
-
-                  <p className="text-xs text-gray-300 leading-relaxed mb-4">
-                    {topic.summary}
+                  </h4>
+                  <p className="text-xs font-semibold text-cyan-400 mb-2 leading-relaxed">
+                    "{topic.question}"
                   </p>
-
-                  <div className="p-3 rounded-xl bg-black/40 border border-white/10 mb-4">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase block mb-1 font-semibold flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-pink-400" /> Highlighted Guide
-                    </span>
-                    <p className="text-xs text-gray-200 font-medium">{topic.popularTopic}</p>
-                  </div>
-
-                  {/* Key Terms Tags */}
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {topic.keyTerms.map((term) => (
-                      <span
-                        key={term}
-                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-gray-300 border border-white/10"
-                      >
-                        {term}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed mb-4">
+                    {topic.explanation}
+                  </p>
                 </div>
 
                 <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-[11px] text-gray-400 font-medium">Non-CSE Friendly</span>
+                  <span className="text-[10px] font-mono text-gray-400">{topic.difficulty}</span>
                   <a
                     href="#roadmaps"
                     className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300"
                   >
-                    <span>View Track</span>
+                    <span>Read Explanation</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </a>
                 </div>
               </div>
             );
           })}
+
         </div>
       </div>
     </section>
