@@ -75,16 +75,39 @@ export default function LiveQuizStudentPage() {
     }
   };
 
-  // Subscribe to live quiz state updates when joined
+  // Subscribe to live quiz state updates when joined + REST polling fallback
   useEffect(() => {
     if (!joined || !roomCode) return;
 
     const targetSessionId = roomCode.trim().toUpperCase();
+
+    // Socket subscription
     const unsubscribe = subscribeToLiveQuiz(targetSessionId, (data) => {
-      setLiveState(data);
+      if (data) setLiveState(data);
     });
 
-    return () => unsubscribe();
+    // REST Polling fallback every 1.5s
+    const fetchLatestState = async () => {
+      try {
+        const res = await fetch(`/api/live-quiz/state?sessionId=${targetSessionId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setLiveState(json.data);
+          }
+        }
+      } catch (err) {
+        console.warn('Student REST state poll error:', err);
+      }
+    };
+
+    fetchLatestState();
+    const interval = setInterval(fetchLatestState, 1500);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [joined, roomCode]);
 
   // Shared timer calculation based on questionStartedAt

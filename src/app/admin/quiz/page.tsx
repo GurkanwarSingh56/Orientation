@@ -26,13 +26,37 @@ export default function HostQuizControlPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Subscribe to RTDB live quiz state for session
+  // Subscribe to RTDB socket listener + REST polling fallback
   useEffect(() => {
     const targetSessionId = sessionId.trim().toUpperCase();
+
+    // Socket listener
     const unsubscribe = subscribeToLiveQuiz(targetSessionId, (data) => {
-      setLiveState(data);
+      if (data) setLiveState(data);
     });
-    return () => unsubscribe();
+
+    // REST Polling fallback every 2s
+    const fetchLatestState = async () => {
+      try {
+        const res = await fetch(`/api/live-quiz/state?sessionId=${targetSessionId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) {
+            setLiveState(json.data);
+          }
+        }
+      } catch (err) {
+        console.warn('REST state poll error:', err);
+      }
+    };
+
+    fetchLatestState();
+    const interval = setInterval(fetchLatestState, 2000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [sessionId]);
 
   // Host Action Handler
@@ -43,7 +67,7 @@ export default function HostQuizControlPage() {
     const domainItem = [FEATURED_DOMAIN, ...DOMAIN_ITEMS].find((d) => d.id === selectedDomain || d.quizSlug === selectedDomain);
 
     try {
-      await fetch('/api/live-quiz/control', {
+      const res = await fetch('/api/live-quiz/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,6 +77,14 @@ export default function HostQuizControlPage() {
           domainTitle: domainItem?.title || selectedDomain,
         }),
       });
+      if (res.ok) {
+        // Trigger instant state fetch
+        const stateRes = await fetch(`/api/live-quiz/state?sessionId=${sessionId.trim().toUpperCase()}`);
+        if (stateRes.ok) {
+          const json = await stateRes.json();
+          if (json.data) setLiveState(json.data);
+        }
+      }
     } catch (err) {
       console.error('Host action error:', err);
     } finally {
@@ -64,6 +96,25 @@ export default function HostQuizControlPage() {
   const onlineParticipants = participantsList.filter((p) => p.online);
   const currentQNum = (liveState?.currentQuestion || 0) + 1;
   const status = (liveState?.status || 'lobby').toUpperCase();
+
+  // Compute fallback leaderboard dynamically if leaderboard array is empty
+  let effectiveLeaderboard = liveState?.leaderboard || [];
+  if (effectiveLeaderboard.length === 0 && participantsList.length > 0) {
+    const sorted = [...participantsList].sort((a, b) => {
+      const scoreA = a.currentScore || 0;
+      const scoreB = b.currentScore || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (a.answeredCount || 0) - (b.answeredCount || 0);
+    });
+
+    effectiveLeaderboard = sorted.map((p, idx) => ({
+      rank: idx + 1,
+      participantId: p.participantId,
+      displayName: p.displayName || 'Student',
+      score: p.currentScore || 0,
+      answeredCount: p.answeredCount || 0,
+    }));
+  }
 
   return (
     <main className="bg-[#050814] min-h-screen text-white flex flex-col justify-between selection:bg-cyan-400 selection:text-black">
@@ -245,13 +296,13 @@ export default function HostQuizControlPage() {
               </span>
             </div>
 
-            {!liveState?.leaderboard || liveState.leaderboard.length === 0 ? (
+            {effectiveLeaderboard.length === 0 ? (
               <p className="text-xs text-gray-400 py-8 text-center">
                 Leaderboard will update automatically as students submit answers.
               </p>
             ) : (
               <div className="space-y-2.5">
-                {liveState.leaderboard.map((item) => (
+                {effectiveLeaderboard.map((item) => (
                   <div
                     key={item.participantId}
                     className="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between hover:border-cyan-500/30 transition-all"
