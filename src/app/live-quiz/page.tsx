@@ -45,8 +45,27 @@ export default function LiveQuizStudentPage() {
 
       const targetSessionId = roomCode.trim().toUpperCase();
 
-      // Establish RTDB node & connection-aware presence
-      await joinLiveQuizSessionWithPresence(targetSessionId, user.uid, name.trim());
+      // Register participant via REST API
+      const joinRes = await fetch('/api/live-quiz/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: targetSessionId,
+          participantId: user.uid,
+          displayName: name.trim(),
+        }),
+      });
+
+      if (!joinRes.ok) {
+        const errData = await joinRes.json();
+        throw new Error(errData.error || 'Failed to join live session.');
+      }
+
+      // Establish client presence listener (non-blocking)
+      joinLiveQuizSessionWithPresence(targetSessionId, user.uid, name.trim()).catch((presenceErr) => {
+        console.warn('Client presence fallback warning:', presenceErr);
+      });
+
       setJoined(true);
     } catch (err: any) {
       console.error('Failed to join live session:', err);
