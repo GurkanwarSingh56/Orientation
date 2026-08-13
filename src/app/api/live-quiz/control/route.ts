@@ -1,29 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rtdb } from '@/lib/firebase/config';
-import { ref, set, update, get } from 'firebase/database';
-import { DomainSlug } from '@/lib/types/quiz';
+import { ref, update, get } from 'firebase/database';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action, sessionId, domain, domainTitle } = body;
 
-    const targetSessionId = (sessionId || 'TV26').toUpperCase();
+    const targetSessionId = (sessionId || 'TV26').trim().toUpperCase();
     const sessionRef = ref(rtdb, `liveQuiz/${targetSessionId}`);
 
     if (action === 'create') {
-      const initialData = {
+      const snap = await get(sessionRef);
+      const existingData = snap.exists() ? snap.val() : {};
+
+      const sessionUpdates = {
         sessionId: targetSessionId,
-        status: 'lobby',
-        domain: domain || 'cybersecurity',
-        domainTitle: domainTitle || 'Cybersecurity',
-        currentQuestion: 0,
-        questionStartedAt: null,
+        status: existingData.status || 'lobby',
+        domain: domain || existingData.domain || 'cybersecurity',
+        domainTitle: domainTitle || existingData.domainTitle || 'Cybersecurity',
+        currentQuestion: existingData.currentQuestion ?? 0,
+        questionStartedAt: existingData.questionStartedAt ?? null,
         questionDuration: 30,
-        leaderboard: [],
       };
-      await set(sessionRef, initialData);
-      return NextResponse.json({ success: true, state: initialData });
+
+      await update(sessionRef, sessionUpdates);
+      return NextResponse.json({ success: true, state: sessionUpdates });
     }
 
     if (action === 'start') {
