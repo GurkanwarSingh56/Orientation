@@ -37,39 +37,35 @@ export default function LiveQuizStudentPage() {
 
     setErrorMsg(null);
     setIsSubmitting(true);
+    localStorage.setItem('technovate_student_name', name.trim());
+
+    // INSTANT UI TRANSITION to Lobby Screen
+    setJoined(true);
+
+    const targetSessionId = roomCode.trim().toUpperCase();
 
     try {
-      localStorage.setItem('technovate_student_name', name.trim());
       const user = await signInAnonymouslyUser();
-      setParticipantId(user.uid);
-
-      const targetSessionId = roomCode.trim().toUpperCase();
+      const pId = user?.uid || 'usr_' + Math.random().toString(36).substring(2, 9);
+      setParticipantId(pId);
 
       // Register participant via REST API
-      const joinRes = await fetch('/api/live-quiz/join', {
+      await fetch('/api/live-quiz/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: targetSessionId,
-          participantId: user.uid,
+          participantId: pId,
           displayName: name.trim(),
         }),
-      });
-
-      if (!joinRes.ok) {
-        const errData = await joinRes.json();
-        throw new Error(errData.error || 'Failed to join live session.');
-      }
+      }).catch((err) => console.warn('Background join fetch warning:', err));
 
       // Establish client presence listener (non-blocking)
-      joinLiveQuizSessionWithPresence(targetSessionId, user.uid, name.trim()).catch((presenceErr) => {
+      joinLiveQuizSessionWithPresence(targetSessionId, pId, name.trim()).catch((presenceErr) => {
         console.warn('Client presence fallback warning:', presenceErr);
       });
-
-      setJoined(true);
     } catch (err: any) {
-      console.error('Failed to join live session:', err);
-      setErrorMsg(err.message || 'Failed to join live quiz session.');
+      console.warn('Background auth/join warning:', err);
     } finally {
       setIsSubmitting(false);
     }
