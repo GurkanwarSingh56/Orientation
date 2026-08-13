@@ -9,7 +9,10 @@ const DATABASE_URL = (
 export async function getRTDBServer<T = any>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${DATABASE_URL}/${path}.json`, { cache: 'no-store' });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`RTDB GET warning HTTP ${res.status} on path ${path}`);
+      return null;
+    }
     return await res.json();
   } catch (err) {
     console.error(`RTDB GET error on path ${path}:`, err);
@@ -24,7 +27,12 @@ export async function patchRTDBServer(path: string, data: Record<string, any>): 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    return res.ok;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn(`RTDB PATCH warning HTTP ${res.status} on path ${path}: ${errText}`);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error(`RTDB PATCH error on path ${path}:`, err);
     return false;
@@ -38,7 +46,12 @@ export async function putRTDBServer(path: string, data: any): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    return res.ok;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn(`RTDB PUT warning HTTP ${res.status} on path ${path}: ${errText}`);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error(`RTDB PUT error on path ${path}:`, err);
     return false;
