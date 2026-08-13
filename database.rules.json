@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "liveQuiz": {
+      "$sessionId": {
+        ".read": "auth != null",
+        
+        "status": {
+          ".write": "auth != null && auth.token.admin === true"
+        },
+        "currentQuestion": {
+          ".write": "auth != null && auth.token.admin === true"
+        },
+        "questionStartedAt": {
+          ".write": "auth != null && auth.token.admin === true"
+        },
+        "leaderboard": {
+          ".write": "auth != null && auth.token.admin === true"
+        },
+        "participants": {
+          "$participantId": {
+            ".write": "auth != null && auth.uid === $participantId",
+            ".validate": "newData.hasChildren(['participantId', 'displayName']) && newData.child('participantId').val() === auth.uid"
+          }
+        }
+      }
+    }
+  }
+}
