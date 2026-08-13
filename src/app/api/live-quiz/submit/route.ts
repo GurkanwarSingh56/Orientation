@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ALL_QUIZ_QUESTIONS } from '@/lib/data/quiz-questions';
-import { rtdb } from '@/lib/firebase/config';
-import { ref, get, update, set } from 'firebase/database';
+import { getRTDBServer, patchRTDBServer, putRTDBServer } from '@/lib/firebase/rtdb-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,40 +21,27 @@ export async function POST(req: NextRequest) {
 
     const isCorrect = masterQuestion.correctAnswer === selectedOption;
 
-    // Fetch participant's current state from RTDB
-    const participantRef = ref(rtdb, `liveQuiz/${targetSessionId}/participants/${participantId}`);
-    const participantSnap = await get(participantRef);
+    // Fetch participant node via REST
+    const participantPath = `liveQuiz/${targetSessionId}/participants/${participantId}`;
+    const participantData = (await getRTDBServer(participantPath)) || {};
 
-    let currentScore = 0;
-    let answeredCount = 0;
-    let displayName = 'Student';
+    const currentScore = (participantData.currentScore || 0) + (isCorrect ? 1 : 0);
+    const answeredCount = (participantData.answeredCount || 0) + 1;
+    const displayName = participantData.displayName || 'Student';
 
-    if (participantSnap.exists()) {
-      const data = participantSnap.val();
-      currentScore = (data.currentScore || 0) + (isCorrect ? 1 : 0);
-      answeredCount = (data.answeredCount || 0) + 1;
-      displayName = data.displayName || displayName;
-    } else {
-      currentScore = isCorrect ? 1 : 0;
-      answeredCount = 1;
-    }
-
-    // Update participant node in RTDB
-    await update(participantRef, {
+    // Update participant node
+    await patchRTDBServer(participantPath, {
       currentScore,
       answeredCount,
       lastActive: Date.now(),
     });
 
     // Recalculate Live Leaderboard server-side
-    const allParticipantsRef = ref(rtdb, `liveQuiz/${targetSessionId}/participants`);
-    const allParticipantsSnap = await get(allParticipantsRef);
+    const participantsPath = `liveQuiz/${targetSessionId}/participants`;
+    const participantsObj = (await getRTDBServer(participantsPath)) || {};
+    const participantsList = Object.values(participantsObj) as any[];
 
-    if (allParticipantsSnap.exists()) {
-      const participantsObj = allParticipantsSnap.val();
-      const participantsList = Object.values(participantsObj) as any[];
-
-      // Sort by score descending, then answered count ascending
+    if (participantsList.length > 0) {
       participantsList.sort((a, b) => {
         const scoreA = a.currentScore || 0;
         const scoreB = b.currentScore || 0;
@@ -73,8 +59,7 @@ export async function POST(req: NextRequest) {
         answeredCount: p.answeredCount || 0,
       }));
 
-      const leaderboardRef = ref(rtdb, `liveQuiz/${targetSessionId}/leaderboard`);
-      await set(leaderboardRef, updatedLeaderboard);
+      await putRTDBServer(`liveQuiz/${targetSessionId}/leaderboard`, updatedLeaderboard);
     }
 
     return NextResponse.json({

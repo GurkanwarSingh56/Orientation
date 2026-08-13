@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rtdb } from '@/lib/firebase/config';
-import { ref, update, get } from 'firebase/database';
+import { getRTDBServer, patchRTDBServer } from '@/lib/firebase/rtdb-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,11 +7,10 @@ export async function POST(req: NextRequest) {
     const { action, sessionId, domain, domainTitle } = body;
 
     const targetSessionId = (sessionId || 'TV26').trim().toUpperCase();
-    const sessionRef = ref(rtdb, `liveQuiz/${targetSessionId}`);
+    const sessionPath = `liveQuiz/${targetSessionId}`;
 
     if (action === 'create') {
-      const snap = await get(sessionRef);
-      const existingData = snap.exists() ? snap.val() : {};
+      const existingData = (await getRTDBServer(sessionPath)) || {};
 
       const sessionUpdates = {
         sessionId: targetSessionId,
@@ -24,12 +22,12 @@ export async function POST(req: NextRequest) {
         questionDuration: 30,
       };
 
-      await update(sessionRef, sessionUpdates);
+      await patchRTDBServer(sessionPath, sessionUpdates);
       return NextResponse.json({ success: true, state: sessionUpdates });
     }
 
     if (action === 'start') {
-      await update(sessionRef, {
+      await patchRTDBServer(sessionPath, {
         status: 'active',
         currentQuestion: 0,
         questionStartedAt: Date.now(),
@@ -38,18 +36,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'nextQuestion') {
-      const snap = await get(sessionRef);
-      const current = snap.exists() ? snap.val().currentQuestion || 0 : 0;
+      const existingData = (await getRTDBServer(sessionPath)) || {};
+      const current = existingData.currentQuestion || 0;
       const nextIndex = current + 1;
 
       if (nextIndex >= 10) {
-        await update(sessionRef, {
+        await patchRTDBServer(sessionPath, {
           status: 'ended',
           questionStartedAt: null,
         });
         return NextResponse.json({ success: true, status: 'ended' });
       } else {
-        await update(sessionRef, {
+        await patchRTDBServer(sessionPath, {
           status: 'active',
           currentQuestion: nextIndex,
           questionStartedAt: Date.now(),
@@ -59,14 +57,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'pause') {
-      await update(sessionRef, {
+      await patchRTDBServer(sessionPath, {
         status: 'paused',
       });
       return NextResponse.json({ success: true, status: 'paused' });
     }
 
     if (action === 'end') {
-      await update(sessionRef, {
+      await patchRTDBServer(sessionPath, {
         status: 'ended',
         questionStartedAt: null,
       });
