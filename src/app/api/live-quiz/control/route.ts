@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRTDBServer, patchRTDBServer } from '@/lib/firebase/rtdb-server';
+import { getMemorySession, updateMemorySession } from '@/lib/live-quiz-memory';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,52 +23,61 @@ export async function POST(req: NextRequest) {
         questionDuration: 30,
       };
 
+      updateMemorySession(targetSessionId, sessionUpdates as any);
       await patchRTDBServer(sessionPath, sessionUpdates);
       return NextResponse.json({ success: true, state: sessionUpdates });
     }
 
     if (action === 'start') {
-      await patchRTDBServer(sessionPath, {
-        status: 'active',
+      const updates = {
+        status: 'active' as const,
         currentQuestion: 0,
         questionStartedAt: Date.now(),
-      });
+      };
+      updateMemorySession(targetSessionId, updates);
+      await patchRTDBServer(sessionPath, updates);
       return NextResponse.json({ success: true, status: 'active', currentQuestion: 0 });
     }
 
     if (action === 'nextQuestion') {
-      const existingData = (await getRTDBServer(sessionPath)) || {};
-      const current = existingData.currentQuestion || 0;
+      const memSession = getMemorySession(targetSessionId);
+      const current = memSession.currentQuestion || 0;
       const nextIndex = current + 1;
 
       if (nextIndex >= 10) {
-        await patchRTDBServer(sessionPath, {
-          status: 'ended',
+        const updates = {
+          status: 'ended' as const,
           questionStartedAt: null,
-        });
+        };
+        updateMemorySession(targetSessionId, updates);
+        await patchRTDBServer(sessionPath, updates);
         return NextResponse.json({ success: true, status: 'ended' });
       } else {
-        await patchRTDBServer(sessionPath, {
-          status: 'active',
+        const updates = {
+          status: 'active' as const,
           currentQuestion: nextIndex,
           questionStartedAt: Date.now(),
-        });
+        };
+        updateMemorySession(targetSessionId, updates);
+        await patchRTDBServer(sessionPath, updates);
         return NextResponse.json({ success: true, status: 'active', currentQuestion: nextIndex });
       }
     }
 
     if (action === 'pause') {
-      await patchRTDBServer(sessionPath, {
-        status: 'paused',
-      });
+      const updates = { status: 'paused' as const };
+      updateMemorySession(targetSessionId, updates);
+      await patchRTDBServer(sessionPath, updates);
       return NextResponse.json({ success: true, status: 'paused' });
     }
 
     if (action === 'end') {
-      await patchRTDBServer(sessionPath, {
-        status: 'ended',
+      const updates = {
+        status: 'ended' as const,
         questionStartedAt: null,
-      });
+      };
+      updateMemorySession(targetSessionId, updates);
+      await patchRTDBServer(sessionPath, updates);
       return NextResponse.json({ success: true, status: 'ended' });
     }
 

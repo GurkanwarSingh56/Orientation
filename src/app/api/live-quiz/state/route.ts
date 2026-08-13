@@ -1,41 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRTDBServer } from '@/lib/firebase/rtdb-server';
+import { getMemorySession } from '@/lib/live-quiz-memory';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const sessionId = (searchParams.get('sessionId') || 'TV26').trim().toUpperCase();
 
-    const sessionData = (await getRTDBServer(`liveQuiz/${sessionId}`)) || {};
+    // 1. Get memory session
+    const memSession = getMemorySession(sessionId);
 
-    // Transform participants map to array if present
-    const participantsMap = sessionData.participants || {};
-    const participantsList = Object.values(participantsMap) as any[];
+    // 2. Try fetching RTDB server session
+    const rtdbSession = (await getRTDBServer(`liveQuiz/${sessionId}`)) || {};
 
-    // Recalculate leaderboard dynamically if missing
-    let leaderboard = sessionData.leaderboard || [];
-    if (participantsList.length > 0 && leaderboard.length === 0) {
-      participantsList.sort((a, b) => (b.currentScore || 0) - (a.currentScore || 0));
-      leaderboard = participantsList.map((p, idx) => ({
-        rank: idx + 1,
-        participantId: p.participantId,
-        displayName: p.displayName || 'Student',
-        score: p.currentScore || 0,
-        answeredCount: p.answeredCount || 0,
-      }));
-    }
+    // Merge participant rosters
+    const mergedParticipants = {
+      ...(memSession.participants || {}),
+      ...(rtdbSession.participants || {}),
+    };
+
+    const participantsList = Object.values(mergedParticipants) as any[];
+
+    // Calculate leaderboard
+    participantsList.sort((a, b) => {
+      const scoreA = a.currentScore || 0;
+      const scoreB = b.currentScore || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (a.answeredCount || 0) - (b.answeredCount || 0);
+    });
+
+    const leaderboard = participantsList.map((p, idx) => ({
+      rank: idx + 1,
+      participantId: p.participantId,
+      displayName: p.displayName || 'Student',
+      score: p.currentScore || 0,
+      answeredCount: p.answeredCount || 0,
+    }));
 
     return NextResponse.json({
       success: true,
       data: {
         sessionId,
-        status: sessionData.status || 'lobby',
-        domain: sessionData.domain || 'cybersecurity',
-        domainTitle: sessionData.domainTitle || 'Cybersecurity',
-        currentQuestion: sessionData.currentQuestion ?? 0,
-        questionStartedAt: sessionData.questionStartedAt ?? null,
-        questionDuration: sessionData.questionDuration ?? 30,
-        participants: participantsMap,
+        status: rtdbSession.status || memSession.status || 'lobby',
+        domain: rtdbSession.domain || memSession.domain || 'cybersecurity',
+        domainTitle: rtdbSession.domainTitle || memSession.domainTitle || 'Cybersecurity',
+        currentQuestion: rtdbSession.currentQuestion ?? memSession.currentQuestion ?? 0,
+        questionStartedAt: rtdbSession.questionStartedAt ?? memSession.questionStartedAt ?? null,
+        questionDuration: rtdbSession.questionDuration ?? memSession.questionDuration ?? 30,
+        participants: mergedParticipants,
         leaderboard,
       },
     });

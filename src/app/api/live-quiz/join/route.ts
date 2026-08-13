@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRTDBServer, patchRTDBServer } from '@/lib/firebase/rtdb-server';
+import { addOrUpdateMemoryParticipant } from '@/lib/live-quiz-memory';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,8 +12,12 @@ export async function POST(req: NextRequest) {
     }
 
     const targetSessionId = sessionId.trim().toUpperCase();
-    const participantPath = `liveQuiz/${targetSessionId}/participants/${participantId}`;
 
+    // 1. Sync to in-memory store (instant fallback)
+    const memParticipant = addOrUpdateMemoryParticipant(targetSessionId, participantId, displayName);
+
+    // 2. Sync to Firebase RTDB REST
+    const participantPath = `liveQuiz/${targetSessionId}/participants/${participantId}`;
     const existingData = (await getRTDBServer(participantPath)) || {};
 
     const participantUpdates = {
@@ -25,19 +30,15 @@ export async function POST(req: NextRequest) {
       lastActive: Date.now(),
     };
 
-    const success = await patchRTDBServer(participantPath, participantUpdates);
-    if (!success) {
-      console.warn('⚠️ Server RTDB patch returned false for join. Proceeding with client state.');
-    }
+    await patchRTDBServer(participantPath, participantUpdates);
 
-    return NextResponse.json({ success: true, participant: participantUpdates });
+    return NextResponse.json({ success: true, participant: memParticipant });
   } catch (error: any) {
     console.error('Participant join error:', error);
-    // Graceful fallback to avoid breaking student UI
     return NextResponse.json({
       success: true,
       participant: {
-        participantId: req.body ? 'fallback' : 'anon',
+        participantId: 'anon',
         displayName: 'Student',
         online: true,
       },
