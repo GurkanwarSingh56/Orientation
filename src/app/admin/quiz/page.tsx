@@ -7,12 +7,24 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { subscribeToLiveQuiz, LiveQuizState } from '@/lib/firebase/rtdb';
 import { DOMAIN_ITEMS, FEATURED_DOMAIN } from '@/lib/data/domain-data';
+import { signInAnonymouslyUser } from '@/lib/firebase/auth';
 
 export default function HostQuizControlPage() {
   const [sessionId, setSessionId] = useState('TV26');
   const [selectedDomain, setSelectedDomain] = useState('cybersecurity');
   const [liveState, setLiveState] = useState<LiveQuizState | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+
+  // Authenticate host anonymously on mount & initialize session
+  useEffect(() => {
+    signInAnonymouslyUser().catch((err) => console.warn('Host auth error:', err));
+  }, []);
+
+  // Initialize session TV26 on mount
+  useEffect(() => {
+    handleHostAction('create');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Subscribe to RTDB live quiz state for session
   useEffect(() => {
@@ -211,9 +223,10 @@ export default function HostQuizControlPage() {
                       <span className="font-bold text-white">{p.displayName}</span>
                     </div>
 
-                    <span className="text-[11px] font-mono text-gray-400">
-                      {p.online ? '🟢 Online' : '⚪ Offline'}
-                    </span>
+                    <div className="flex items-center space-x-2 text-[11px] font-mono">
+                      <span className="text-cyan-300 font-bold">{p.currentScore || 0} pts</span>
+                      <span className="text-gray-400">({p.online ? '🟢 Online' : '⚪ Offline'})</span>
+                    </div>
                   </div>
                 ))}
               </div>

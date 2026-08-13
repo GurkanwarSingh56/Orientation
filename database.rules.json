@@ -2,24 +2,23 @@
   "rules": {
     "liveQuiz": {
       "$sessionId": {
-        ".read": "auth != null",
-        
+        ".read": true,
+        ".write": true,
         "status": {
-          ".write": "auth != null && auth.token.admin === true"
+          ".write": true
         },
         "currentQuestion": {
-          ".write": "auth != null && auth.token.admin === true"
+          ".write": true
         },
         "questionStartedAt": {
-          ".write": "auth != null && auth.token.admin === true"
+          ".write": true
         },
         "leaderboard": {
-          ".write": "auth != null && auth.token.admin === true"
+          ".write": true
         },
         "participants": {
           "$participantId": {
-            ".write": "auth != null && auth.uid === $participantId",
-            ".validate": "newData.hasChildren(['participantId', 'displayName']) && newData.child('participantId').val() === auth.uid"
+            ".write": true
           }
         }
       }
