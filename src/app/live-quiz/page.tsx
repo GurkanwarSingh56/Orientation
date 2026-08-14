@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Zap, CheckCircle2, Clock, Award, Loader2, Play } from 'lucide-react';
+import { ArrowLeft, Users, Zap, CheckCircle2, Clock, Award, Loader2, Play, Pause } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { signInAnonymouslyUser } from '@/lib/firebase/auth';
@@ -19,7 +19,7 @@ export default function LiveQuizStudentPage() {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submittedForQuestion, setSubmittedForQuestion] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(30);
+  const [localTimer, setLocalTimer] = useState<number>(30);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Auto-restore saved name on mount
@@ -37,6 +37,23 @@ export default function LiveQuizStudentPage() {
 
     setErrorMsg(null);
     setIsSubmitting(true);
+    
+    // Check global state first to prevent late joining
+    try {
+      const targetSessionId = roomCode.trim().toUpperCase();
+      const stateRes = await fetch(`/api/live-quiz/state?sessionId=${targetSessionId}`);
+      if (stateRes.ok) {
+        const json = await stateRes.json();
+        if (json.data && json.data.status !== 'LOBBY') {
+          setErrorMsg('TEST ALREADY STARTED. You cannot join this live quiz.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    } catch (err) {
+      // Ignore network errors here and proceed
+    }
+
     localStorage.setItem('technovate_student_name', name.trim());
 
     // INSTANT UI TRANSITION to Lobby Screen
@@ -106,20 +123,24 @@ export default function LiveQuizStudentPage() {
     };
   }, [joined, roomCode]);
 
-  // Shared timer calculation based on questionStartedAt
+  // Synchronize timer precisely from Firebase state
   useEffect(() => {
-    if (!liveState || liveState.status !== 'active' || !liveState.questionStartedAt) {
+    if (!liveState) return;
+
+    if (liveState.status === 'PAUSED' || liveState.status === 'FINISHED' || liveState.status === 'LOBBY') {
+      setLocalTimer(liveState.remainingTime || 0);
       return;
     }
 
-    const duration = liveState.questionDuration || 30;
-    const interval = setInterval(() => {
-      const elapsedSec = Math.floor((Date.now() - (liveState.questionStartedAt || Date.now())) / 1000);
-      const remaining = Math.max(0, duration - elapsedSec);
-      setRemainingSeconds(remaining);
-    }, 500);
-
-    return () => clearInterval(interval);
+    if (liveState.status === 'RUNNING' && liveState.questionStartedAt) {
+      const duration = liveState.questionDuration || 30;
+      const timerInterval = setInterval(() => {
+        const elapsedSec = Math.floor((Date.now() - (liveState.questionStartedAt || Date.now())) / 1000);
+        const remaining = Math.max(0, duration - elapsedSec);
+        setLocalTimer(remaining);
+      }, 500);
+      return () => clearInterval(timerInterval);
+    }
   }, [liveState]);
 
   // Reset selected option when host advances question
@@ -129,12 +150,11 @@ export default function LiveQuizStudentPage() {
 
   // Handle submitting answer to server evaluation API
   const handleSubmitAnswer = async (optionIdx: number) => {
-    if (isSubmitting || !liveState || !participantId) return;
+    if (isSubmitting || !liveState || !participantId || liveState.status !== 'RUNNING') return;
     setSelectedOption(optionIdx);
     setIsSubmitting(true);
 
-    const questionsList = ALL_QUIZ_QUESTIONS.filter((q) => q.domain === (liveState.domain || 'cybersecurity'));
-    const currentQ = questionsList[liveState.currentQuestion || 0] || questionsList[0];
+    const currentQ = ALL_QUIZ_QUESTIONS[liveState.currentQuestion || 0];
 
     try {
       const res = await fetch('/api/live-quiz/submit', {
@@ -163,9 +183,14 @@ export default function LiveQuizStudentPage() {
 
   // Count online participants
   const participantsList = liveState?.participants ? Object.values(liveState.participants) : [];
-  const onlineParticipants = participantsList.filter((p) => p.online);
-  const questionsList = liveState ? ALL_QUIZ_QUESTIONS.filter((q) => q.domain === (liveState.domain || 'cybersecurity')) : [];
-  const currentQ = questionsList[liveState?.currentQuestion || 0] || questionsList[0];
+  const currentQ = ALL_QUIZ_QUESTIONS[liveState?.currentQuestion || 0];
+  const totalQuestions = ALL_QUIZ_QUESTIONS.length;
+  const status = liveState?.status || 'LOBBY';
+
+  // Compute My Final Score for Results Screen
+  const myData = liveState?.participants ? liveState.participants[participantId] : null;
+  const myScore = myData?.currentScore || 0;
+  const myPercentage = ((myScore / totalQuestions) * 100).toFixed(2);
 
   return (
     <main className="bg-[#050814] min-h-screen text-white flex flex-col justify-between selection:bg-cyan-400 selection:text-black">
@@ -263,23 +288,16 @@ export default function LiveQuizStudentPage() {
                   LIVE QUIZ • ROOM: {roomCode}
                 </span>
                 <h2 className="text-xl font-extrabold text-white">
-                  {liveState?.domainTitle || 'Technovate Live Session'}
+                  Technovate Live Competition
                 </h2>
                 <p className="text-xs text-gray-300 mt-1">
                   Joined as <span className="text-cyan-300 font-semibold">{name}</span>
                 </p>
               </div>
-
-              <div className="flex items-center space-x-3">
-                <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  {onlineParticipants.length} Participants Online
-                </span>
-              </div>
             </div>
 
             {/* 2. LOBBY VIEW */}
-            {(!liveState || liveState.status === 'lobby') && (
+            {status === 'LOBBY' && (
               <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mx-auto flex items-center justify-center">
                   <Clock className="w-6 h-6 animate-spin" />
@@ -287,13 +305,14 @@ export default function LiveQuizStudentPage() {
                 <div>
                   <h3 className="text-lg font-bold text-white mb-1">Waiting for host to start...</h3>
                   <p className="text-xs text-gray-400">
-                    Get ready! The host will start the quiz questions shortly.
+                    Get ready! The host will start the {totalQuestions} questions shortly.
                   </p>
                 </div>
 
                 {/* Participant Roster */}
                 <div className="pt-4 border-t border-white/10 text-left">
-                  <h4 className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider mb-3">
+                  <h4 className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-cyan-400" />
                     Connected Participants ({participantsList.length})
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-2">
@@ -312,15 +331,15 @@ export default function LiveQuizStudentPage() {
             )}
 
             {/* 3. ACTIVE QUIZ QUESTION VIEW */}
-            {liveState?.status === 'active' && currentQ && (
+            {status === 'RUNNING' && currentQ && (
               <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6">
                 <div className="flex items-center justify-between pb-4 border-b border-white/10">
                   <span className="text-xs font-mono font-bold text-cyan-400">
-                    Question {(liveState.currentQuestion || 0) + 1} of {questionsList.length || 10}
+                    Question {(liveState?.currentQuestion || 0) + 1} of {totalQuestions}
                   </span>
                   <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
-                    {remainingSeconds}s remaining
+                    {localTimer}s remaining
                   </span>
                 </div>
 
@@ -341,7 +360,7 @@ export default function LiveQuizStudentPage() {
                       <button
                         key={optIdx}
                         onClick={() => handleSubmitAnswer(optIdx)}
-                        disabled={isSubmitting || submittedForQuestion === (liveState.currentQuestion || 0)}
+                        disabled={isSubmitting || submittedForQuestion === (liveState?.currentQuestion || 0)}
                         className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex items-center justify-between ${optionStyle}`}
                       >
                         <div className="flex items-center space-x-3.5">
@@ -356,7 +375,7 @@ export default function LiveQuizStudentPage() {
                   })}
                 </div>
 
-                {submittedForQuestion === (liveState.currentQuestion || 0) && (
+                {submittedForQuestion === (liveState?.currentQuestion || 0) && (
                   <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-center space-x-2">
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Answer submitted! Waiting for host to reveal next question...</span>
@@ -366,52 +385,44 @@ export default function LiveQuizStudentPage() {
             )}
 
             {/* 4. PAUSED QUIZ VIEW */}
-            {liveState?.status === 'paused' && (
+            {status === 'PAUSED' && (
               <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-amber-500/30 shadow-xl space-y-6 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mx-auto flex items-center justify-center">
-                  <Clock className="w-8 h-8 animate-pulse" />
+                  <Pause className="w-8 h-8 fill-current" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-extrabold text-white">QUIZ PAUSED BY HOST</h3>
+                  <h3 className="text-2xl font-extrabold text-white">QUIZ PAUSED</h3>
                   <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
                     The host has temporarily paused the quiz. Please wait until the host resumes the session.
                   </p>
+                </div>
+                <div className="text-xs font-mono text-amber-500 pt-4 border-t border-amber-500/20">
+                  Question {(liveState?.currentQuestion || 0) + 1} / {totalQuestions}
                 </div>
               </div>
             )}
 
             {/* 5. QUIZ FINISHED VIEW */}
-            {liveState?.status === 'ended' && (
-              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mx-auto flex items-center justify-center">
-                  <Award className="w-8 h-8" />
+            {status === 'FINISHED' && (
+              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-emerald-500/30 shadow-xl space-y-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center">
+                  <Award className="w-10 h-10" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-extrabold text-white">LIVE QUIZ FINISHED</h3>
-                  <p className="text-xs text-gray-400 mt-1">Here is the final session leaderboard!</p>
+                  <h3 className="text-3xl font-extrabold text-white tracking-wide">🏆 QUIZ COMPLETED</h3>
+                  <p className="text-sm text-gray-400 mt-2">
+                    The live competition has concluded!
+                  </p>
                 </div>
 
-                <div className="space-y-2.5 pt-2 text-left">
-                  {liveState.leaderboard && liveState.leaderboard.length > 0 ? (
-                    liveState.leaderboard.map((item) => (
-                      <div
-                        key={item.participantId}
-                        className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <span className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono text-xs flex items-center justify-center font-bold">
-                            #{item.rank}
-                          </span>
-                          <span className="text-sm font-bold text-white">{item.displayName}</span>
-                        </div>
-                        <span className="text-sm font-mono font-bold text-cyan-300">
-                          {item.score} / 10 Correct
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-gray-400 text-center">No participants recorded.</p>
-                  )}
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                  <p className="text-xs font-mono text-gray-400 uppercase tracking-widest">Your Final Score</p>
+                  <p className="text-4xl font-extrabold text-white">
+                    {myScore} <span className="text-lg text-gray-400 font-medium">/ {totalQuestions}</span>
+                  </p>
+                  <p className="text-sm font-bold text-emerald-400 pt-1">
+                    {myPercentage}% Accuracy
+                  </p>
                 </div>
               </div>
             )}

@@ -81,6 +81,13 @@ export default function QuizPage({ params }: { params: { domain: string } }) {
       ...prev,
       [questionId]: optionIdx,
     }));
+
+    // Auto-advance after a short delay
+    if (currentStep < totalQuestions - 1) {
+      setTimeout(() => {
+        setCurrentStep((prev) => prev + 1);
+      }, 400);
+    }
   };
 
   const handleNextStep = () => {
@@ -325,15 +332,7 @@ export default function QuizPage({ params }: { params: { domain: string } }) {
                 </div>
 
                 {currentStep < totalQuestions - 1 ? (
-                  <button
-                    type="button"
-                    onClick={handleNextStep}
-                    disabled={isSubmitting}
-                    className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs flex items-center space-x-1.5 transition-all"
-                  >
-                    <span>Next Question</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  <div className="w-[140px]" />
                 ) : (
                   <button
                     type="button"

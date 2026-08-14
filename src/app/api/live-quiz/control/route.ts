@@ -5,24 +5,21 @@ import { getMemorySession, updateMemorySession } from '@/lib/live-quiz-memory';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, sessionId, domain, domainTitle } = body;
+    const { action, sessionId } = body;
 
     const targetSessionId = (sessionId || 'TV26').trim().toUpperCase();
     const sessionPath = `liveQuiz/${targetSessionId}`;
 
     if (action === 'create') {
       const existingData = (await getRTDBServer(sessionPath)) || {};
-
       const sessionUpdates = {
         sessionId: targetSessionId,
-        status: existingData.status || 'lobby',
-        domain: domain || existingData.domain || 'cybersecurity',
-        domainTitle: domainTitle || existingData.domainTitle || 'Cybersecurity',
+        status: existingData.status || 'LOBBY',
         currentQuestion: existingData.currentQuestion ?? 0,
         questionStartedAt: existingData.questionStartedAt ?? null,
         questionDuration: 30,
+        remainingTime: 30,
       };
-
       updateMemorySession(targetSessionId, sessionUpdates as any);
       await patchRTDBServer(sessionPath, sessionUpdates);
       return NextResponse.json({ success: true, state: sessionUpdates });
@@ -30,13 +27,14 @@ export async function POST(req: NextRequest) {
 
     if (action === 'start') {
       const updates = {
-        status: 'active' as const,
+        status: 'RUNNING' as const,
         currentQuestion: 0,
         questionStartedAt: Date.now(),
+        remainingTime: 30,
       };
       updateMemorySession(targetSessionId, updates);
       await patchRTDBServer(sessionPath, updates);
-      return NextResponse.json({ success: true, status: 'active', currentQuestion: 0 });
+      return NextResponse.json({ success: true, status: 'RUNNING', currentQuestion: 0 });
     }
 
     if (action === 'nextQuestion') {
@@ -44,41 +42,76 @@ export async function POST(req: NextRequest) {
       const current = memSession.currentQuestion || 0;
       const nextIndex = current + 1;
 
-      if (nextIndex >= 10) {
+      // exactly 70 questions (0 to 69)
+      if (nextIndex >= 70) {
         const updates = {
-          status: 'ended' as const,
+          status: 'FINISHED' as const,
           questionStartedAt: null,
+          remainingTime: 0,
         };
         updateMemorySession(targetSessionId, updates);
         await patchRTDBServer(sessionPath, updates);
-        return NextResponse.json({ success: true, status: 'ended' });
+        return NextResponse.json({ success: true, status: 'FINISHED' });
       } else {
         const updates = {
-          status: 'active' as const,
+          status: 'RUNNING' as const,
           currentQuestion: nextIndex,
           questionStartedAt: Date.now(),
+          remainingTime: 30,
         };
         updateMemorySession(targetSessionId, updates);
         await patchRTDBServer(sessionPath, updates);
-        return NextResponse.json({ success: true, status: 'active', currentQuestion: nextIndex });
+        return NextResponse.json({ success: true, status: 'RUNNING', currentQuestion: nextIndex });
       }
     }
 
     if (action === 'pause') {
-      const updates = { status: 'paused' as const };
+      const memSession = getMemorySession(targetSessionId);
+      let rem = memSession.remainingTime || 30;
+      
+      // Calculate exactly how much time is left before pausing
+      if (memSession.status === 'RUNNING' && memSession.questionStartedAt) {
+        const elapsedSec = Math.floor((Date.now() - memSession.questionStartedAt) / 1000);
+        rem = Math.max(0, memSession.questionDuration - elapsedSec);
+      }
+      
+      const updates = { 
+        status: 'PAUSED' as const,
+        remainingTime: rem,
+        questionStartedAt: null,
+      };
+      
       updateMemorySession(targetSessionId, updates);
       await patchRTDBServer(sessionPath, updates);
-      return NextResponse.json({ success: true, status: 'paused' });
+      return NextResponse.json({ success: true, status: 'PAUSED', remainingTime: rem });
+    }
+
+    if (action === 'resume') {
+      const memSession = getMemorySession(targetSessionId);
+      const rem = memSession.remainingTime || 30;
+      
+      // Simulate that the question started (30 - remainingTime) seconds ago
+      const simulatedStartTime = Date.now() - ((30 - rem) * 1000);
+      
+      const updates = {
+        status: 'RUNNING' as const,
+        questionStartedAt: simulatedStartTime,
+      };
+      
+      updateMemorySession(targetSessionId, updates);
+      await patchRTDBServer(sessionPath, updates);
+      return NextResponse.json({ success: true, status: 'RUNNING' });
     }
 
     if (action === 'end') {
       const updates = {
-        status: 'ended' as const,
+        status: 'FINISHED' as const,
         questionStartedAt: null,
+        remainingTime: 0,
       };
       updateMemorySession(targetSessionId, updates);
       await patchRTDBServer(sessionPath, updates);
-      return NextResponse.json({ success: true, status: 'ended' });
+      return NextResponse.json({ success: true, status: 'FINISHED' });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

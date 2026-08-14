@@ -2,18 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Play, SkipForward, Pause, Square, Users, Award, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Shield, Play, SkipForward, Pause, Square, Users, Award, ArrowLeft, RefreshCw, Clock } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { subscribeToLiveQuiz, LiveQuizState } from '@/lib/firebase/rtdb';
-import { DOMAIN_ITEMS, FEATURED_DOMAIN } from '@/lib/data/domain-data';
 import { signInAnonymouslyUser } from '@/lib/firebase/auth';
 
 export default function HostQuizControlPage() {
   const [sessionId, setSessionId] = useState('TV26');
-  const [selectedDomain, setSelectedDomain] = useState('cybersecurity');
   const [liveState, setLiveState] = useState<LiveQuizState | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [localTimer, setLocalTimer] = useState<number>(30);
 
   // Authenticate host anonymously on mount & initialize session
   useEffect(() => {
@@ -59,12 +58,38 @@ export default function HostQuizControlPage() {
     };
   }, [sessionId]);
 
+  // Synchronize timer precisely from Firebase state
+  useEffect(() => {
+    if (!liveState) return;
+
+    if (liveState.status === 'PAUSED' || liveState.status === 'FINISHED' || liveState.status === 'LOBBY') {
+      setLocalTimer(liveState.remainingTime || 0);
+      return;
+    }
+
+    if (liveState.status === 'RUNNING' && liveState.questionStartedAt) {
+      const duration = liveState.questionDuration || 30;
+      const timerInterval = setInterval(() => {
+        const elapsedSec = Math.floor((Date.now() - (liveState.questionStartedAt || Date.now())) / 1000);
+        const remaining = Math.max(0, duration - elapsedSec);
+        setLocalTimer(remaining);
+      }, 500);
+      return () => clearInterval(timerInterval);
+    }
+  }, [liveState]);
+
+  // Auto-advance question when timer reaches 0
+  useEffect(() => {
+    if (liveState?.status === 'RUNNING' && localTimer === 0 && !isBusy) {
+      handleHostAction('nextQuestion');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localTimer, liveState?.status]);
+
   // Host Action Handler
-  const handleHostAction = async (action: 'create' | 'start' | 'nextQuestion' | 'pause' | 'end') => {
+  const handleHostAction = async (action: 'create' | 'start' | 'nextQuestion' | 'pause' | 'resume' | 'end') => {
     if (isBusy) return;
     setIsBusy(true);
-
-    const domainItem = [FEATURED_DOMAIN, ...DOMAIN_ITEMS].find((d) => d.id === selectedDomain || d.quizSlug === selectedDomain);
 
     try {
       const res = await fetch('/api/live-quiz/control', {
@@ -73,8 +98,6 @@ export default function HostQuizControlPage() {
         body: JSON.stringify({
           action,
           sessionId: sessionId.trim().toUpperCase(),
-          domain: selectedDomain,
-          domainTitle: domainItem?.title || selectedDomain,
         }),
       });
       if (res.ok) {
@@ -95,7 +118,7 @@ export default function HostQuizControlPage() {
   const participantsList = liveState?.participants ? Object.values(liveState.participants) : [];
   const onlineParticipants = participantsList.filter((p) => p.online);
   const currentQNum = (liveState?.currentQuestion || 0) + 1;
-  const status = (liveState?.status || 'lobby').toUpperCase();
+  const status = (liveState?.status || 'LOBBY').toUpperCase();
 
   // Compute fallback leaderboard dynamically if leaderboard array is empty
   let effectiveLeaderboard = liveState?.leaderboard || [];
@@ -146,7 +169,7 @@ export default function HostQuizControlPage() {
             </div>
 
             <div className="flex items-center space-x-3">
-              <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+              <span className={`text-xs font-mono font-bold px-3 py-1.5 rounded-full border ${status === 'RUNNING' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' : status === 'PAUSED' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : status === 'FINISHED' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' : 'bg-gray-500/20 text-gray-300 border-gray-500/40'}`}>
                 Status: {status}
               </span>
               <span className="text-xs font-mono font-bold px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
@@ -157,7 +180,7 @@ export default function HostQuizControlPage() {
           </div>
 
           {/* Session Setup Controls */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
               <label className="text-xs font-mono text-gray-300 block mb-1.5">Room Code</label>
               <input
@@ -166,21 +189,6 @@ export default function HostQuizControlPage() {
                 onChange={(e) => setSessionId(e.target.value.toUpperCase())}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-sm uppercase focus:outline-none focus:border-cyan-400"
               />
-            </div>
-
-            <div>
-              <label className="text-xs font-mono text-gray-300 block mb-1.5">Domain Topic</label>
-              <select
-                value={selectedDomain}
-                onChange={(e) => setSelectedDomain(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#0B1124] border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400"
-              >
-                {DOMAIN_ITEMS.map((d) => (
-                  <option key={d.id} value={d.quizSlug}>
-                    {d.title}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="flex items-end">
@@ -199,45 +207,62 @@ export default function HostQuizControlPage() {
 
         {/* Host Control Actions Toolbar */}
         <div className="p-6 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-4">
-          <h3 className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider">
-            Host Action Commands
-          </h3>
+          <div className="flex items-center justify-between pb-4 border-b border-white/10">
+            <h3 className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider">
+              Host Action Commands
+            </h3>
+            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-white/5 text-gray-300 border border-white/10 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              {localTimer}s remaining
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button
-              onClick={() => handleHostAction('start')}
-              disabled={isBusy}
-              className="py-3 px-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>START QUIZ</span>
-            </button>
+            {status !== 'PAUSED' ? (
+              <button
+                onClick={() => handleHostAction('start')}
+                disabled={isBusy || status === 'RUNNING' || status === 'FINISHED'}
+                className="py-3 px-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>START QUIZ</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handleHostAction('resume')}
+                disabled={isBusy}
+                className="py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>RESUME TEST</span>
+              </button>
+            )}
 
             <button
               onClick={() => handleHostAction('nextQuestion')}
-              disabled={isBusy}
-              className="py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+              disabled={isBusy || status === 'FINISHED'}
+              className="py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
             >
               <SkipForward className="w-4 h-4" />
-              <span>NEXT QUESTION ({currentQNum}/10)</span>
+              <span>NEXT QUESTION ({currentQNum}/70)</span>
             </button>
 
             <button
               onClick={() => handleHostAction('pause')}
-              disabled={isBusy}
-              className="py-3 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+              disabled={isBusy || status !== 'RUNNING'}
+              className="py-3 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
             >
               <Pause className="w-4 h-4" />
-              <span>PAUSE</span>
+              <span>PAUSE TEST</span>
             </button>
 
             <button
               onClick={() => handleHostAction('end')}
-              disabled={isBusy}
-              className="py-3 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all"
+              disabled={isBusy || status === 'FINISHED'}
+              className="py-3 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
             >
               <Square className="w-4 h-4" />
-              <span>END QUIZ</span>
+              <span>FINISH TEST</span>
             </button>
           </div>
         </div>
@@ -292,7 +317,7 @@ export default function HostQuizControlPage() {
                 Realtime Leaderboard
               </h3>
               <span className="text-xs font-mono text-cyan-400">
-                Question {currentQNum} of 10
+                Question {currentQNum} of 70
               </span>
             </div>
 

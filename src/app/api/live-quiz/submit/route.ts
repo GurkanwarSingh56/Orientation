@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
 
     const targetSessionId = sessionId.trim().toUpperCase();
 
+    const memSession = getMemorySession(targetSessionId);
+    if (memSession.status !== 'RUNNING') {
+      return NextResponse.json({ error: 'Quiz is not currently running. Submissions are disabled.' }, { status: 403 });
+    }
+
     // Master answer validation
     const masterQuestion = ALL_QUIZ_QUESTIONS.find((q) => q.id === questionId);
     if (!masterQuestion) {
@@ -24,7 +29,6 @@ export async function POST(req: NextRequest) {
 
     // 1. Sync to in-memory store
     const memRes = recordMemoryAnswer(targetSessionId, participantId, isCorrect);
-    const memSession = getMemorySession(targetSessionId);
 
     // 2. Sync to Firebase RTDB REST
     const participantPath = `liveQuiz/${targetSessionId}/participants/${participantId}`;

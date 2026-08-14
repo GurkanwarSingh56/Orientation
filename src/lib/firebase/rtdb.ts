@@ -22,12 +22,11 @@ export interface LiveLeaderboardItem {
 
 export interface LiveQuizState {
   sessionId: string;
-  status: 'lobby' | 'active' | 'paused' | 'ended';
-  domain: DomainSlug;
-  domainTitle: string;
+  status: 'LOBBY' | 'RUNNING' | 'PAUSED' | 'FINISHED';
   currentQuestion: number;
   questionStartedAt: number | null;
   questionDuration: number;
+  remainingTime: number;
   participants: Record<string, LiveParticipantNode>;
   leaderboard: LiveLeaderboardItem[];
 }

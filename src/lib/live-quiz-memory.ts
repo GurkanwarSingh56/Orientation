@@ -10,12 +10,11 @@ export interface MemoryParticipant {
 
 export interface MemorySession {
   sessionId: string;
-  status: 'lobby' | 'active' | 'paused' | 'ended';
-  domain: string;
-  domainTitle: string;
+  status: 'LOBBY' | 'RUNNING' | 'PAUSED' | 'FINISHED';
   currentQuestion: number;
   questionStartedAt: number | null;
   questionDuration: number;
+  remainingTime: number;
   participants: Record<string, MemoryParticipant>;
   leaderboard: Array<{
     rank: number;
@@ -34,12 +33,11 @@ export function getMemorySession(sessionId: string): MemorySession {
   if (!globalSessions[id]) {
     globalSessions[id] = {
       sessionId: id,
-      status: 'lobby',
-      domain: 'cybersecurity',
-      domainTitle: 'Cybersecurity',
+      status: 'LOBBY',
       currentQuestion: 0,
       questionStartedAt: null,
       questionDuration: 30,
+      remainingTime: 30,
       participants: {},
       leaderboard: [],
     };
