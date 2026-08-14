@@ -68,7 +68,9 @@ export default function Navbar() {
           {/* Right: Join Technovate Button */}
           <div className="hidden md:flex items-center space-x-3">
             <a
-              href="#topics"
+              href="https://docs.google.com/forms/d/e/1FAIpQLSfuzvlLSI34YJvl5Lb4ZJciSWZeUR1wfjwgug_E8bUvHKhSjA/viewform?usp=publish-editor"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all flex items-center space-x-1.5"
             >
               <span>Join Technovate</span>
@@ -106,7 +108,9 @@ export default function Navbar() {
 
             <div className="pt-4 border-t border-white/10">
               <a
-                href="#topics"
+                href="https://docs.google.com/forms/d/e/1FAIpQLSfuzvlLSI34YJvl5Lb4ZJciSWZeUR1wfjwgug_E8bUvHKhSjA/viewform?usp=publish-editor"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="w-full text-center py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-sm block shadow-lg shadow-cyan-500/20"
               >

@@ -1,201 +1,219 @@
 import {
+  collection,
   doc,
-  setDoc,
   getDoc,
   getDocs,
-  collection,
+  setDoc,
+  updateDoc,
   query,
   where,
+  orderBy,
+  limit,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
-  FieldValue,
 } from 'firebase/firestore';
 import { db } from './config';
-import { QuizQuestion, QuizSubmission, DomainSlug } from '../types/quiz';
 
-export interface FirestoreParticipant {
-  participantId: string;
-  displayName: string;
-  createdAt: Timestamp | Date | number | FieldValue | any;
-  lastActive: Timestamp | Date | number | FieldValue | any;
-}
-
-export interface FirestoreQuizAttempt {
-  attemptId: string;
-  domain: DomainSlug;
-  participantId: string;
-  studentName: string;
-  submissions: QuizSubmission[];
-  startedAt: Timestamp | Date | number | string | FieldValue | any;
-  completedAt?: Timestamp | Date | number | string | FieldValue | any;
-}
+// ============================================================
+// Types for Firestore documents
+// ============================================================
 
 export interface FirestoreQuizResult {
   resultId: string;
   attemptId: string;
-  domain: DomainSlug;
+  domain: string;
   domainTitle: string;
   participantId: string;
   studentName: string;
   score: number;
   maxScore: number;
+  percentage: number;
   correctCount: number;
   incorrectCount: number;
-  percentage: number;
-  totalPoints: number;
   earnedPoints: number;
-  completedAt: Timestamp | Date | number | string | FieldValue | any;
-  completedDateFormatted?: string;
-  completedTimeFormatted?: string;
+  totalPoints: number;
+  completedAt: string;
+  completedDateFormatted: string;
+  completedTimeFormatted: string;
 }
 
-/**
- * Save participant profile to Firestore
- */
-export async function saveParticipant(participantId: string, displayName: string) {
-  try {
-    const ref = doc(db, 'participants', participantId);
-    await setDoc(
-      ref,
-      {
-        participantId,
-        displayName,
-        lastActive: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (err) {
-    console.warn('Firestore saveParticipant error:', err);
-  }
+export interface FirestoreQuizAttempt {
+  attemptId: string;
+  domain: string;
+  participantId: string;
+  studentName: string;
+  submissions: { questionId: string; selectedOption: number }[];
+  startedAt: string;
+  completedAt: string;
 }
 
-/**
- * Complete quiz submission: saves attempt + evaluated result with serverTimestamp
- */
-export async function saveCompleteQuizSubmission(
-  attemptId: string,
-  domain: DomainSlug,
-  domainTitle: string,
-  participantId: string,
-  studentName: string,
-  submissions: QuizSubmission[],
-  score: number,
-  maxScore: number,
-  earnedPoints: number,
-  totalPoints: number,
-  startedAtIso: string
-): Promise<FirestoreQuizResult> {
-  const now = new Date();
-  const dateFormatted = now.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  const timeFormatted = now.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+// ============================================================
+// Quiz Results
+// ============================================================
 
-  const correctCount = score;
-  const incorrectCount = maxScore - score;
-  const percentage = Math.round((score / maxScore) * 100);
-
-  const attemptData: FirestoreQuizAttempt = {
-    attemptId,
-    domain,
-    participantId,
-    studentName,
-    submissions,
-    startedAt: startedAtIso,
-    completedAt: serverTimestamp(),
-  };
-
-  const resultData: FirestoreQuizResult = {
-    resultId: attemptId,
-    attemptId,
-    domain,
-    domainTitle,
-    participantId,
-    studentName,
-    score,
-    maxScore,
-    correctCount,
-    incorrectCount,
-    percentage,
-    earnedPoints,
-    totalPoints,
-    completedAt: serverTimestamp(),
-    completedDateFormatted: dateFormatted,
-    completedTimeFormatted: timeFormatted,
-  };
-
-  try {
-    const attemptRef = doc(db, 'quizAttempts', attemptId);
-    await setDoc(attemptRef, attemptData);
-
-    const resultRef = doc(db, 'quizResults', attemptId);
-    await setDoc(resultRef, resultData);
-  } catch (err) {
-    console.warn('Firestore write warning (operating with local state persistence fallback):', err);
-  }
-
-  return {
-    ...resultData,
-    completedAt: now.toISOString(),
-  };
-}
-
-/**
- * Fetch a single quiz result by attemptId/resultId
- */
 export async function getQuizResultById(attemptId: string): Promise<FirestoreQuizResult | null> {
   try {
-    const resultRef = doc(db, 'quizResults', attemptId);
-    const snap = await getDoc(resultRef);
+    const docRef = doc(db, 'quizResults', attemptId);
+    const snap = await getDoc(docRef);
     if (snap.exists()) {
       return snap.data() as FirestoreQuizResult;
     }
   } catch (err) {
-    console.warn('Firestore getQuizResultById error:', err);
+    console.warn('getQuizResultById warning:', err);
   }
   return null;
 }
 
-/**
- * Fetch a single quiz attempt by attemptId
- */
 export async function getQuizAttemptById(attemptId: string): Promise<FirestoreQuizAttempt | null> {
   try {
-    const attemptRef = doc(db, 'quizAttempts', attemptId);
-    const snap = await getDoc(attemptRef);
+    const docRef = doc(db, 'quizAttempts', attemptId);
+    const snap = await getDoc(docRef);
     if (snap.exists()) {
       return snap.data() as FirestoreQuizAttempt;
     }
   } catch (err) {
-    console.warn('Firestore getQuizAttemptById error:', err);
+    console.warn('getQuizAttemptById warning:', err);
   }
   return null;
 }
 
-/**
- * Fetch all past completed quiz results for a participant
- */
 export async function getParticipantHistory(participantId: string): Promise<FirestoreQuizResult[]> {
   try {
     const q = query(
       collection(db, 'quizResults'),
-      where('participantId', '==', participantId)
+      where('participantId', '==', participantId),
+      orderBy('completedAt', 'desc'),
+      limit(20)
     );
-    const snapshot = await getDocs(q);
-    const results: FirestoreQuizResult[] = [];
-    snapshot.forEach((docSnap) => {
-      results.push(docSnap.data() as FirestoreQuizResult);
-    });
-    return results;
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => d.data() as FirestoreQuizResult);
   } catch (err) {
-    console.warn('Firestore getParticipantHistory error:', err);
-    return [];
+    console.warn('getParticipantHistory warning:', err);
   }
+  return [];
+}
+
+export async function saveQuizResult(result: FirestoreQuizResult): Promise<void> {
+  try {
+    await setDoc(doc(db, 'quizResults', result.attemptId), result);
+  } catch (err) {
+    console.warn('saveQuizResult warning:', err);
+  }
+}
+
+export async function saveQuizAttempt(attempt: FirestoreQuizAttempt): Promise<void> {
+  try {
+    await setDoc(doc(db, 'quizAttempts', attempt.attemptId), attempt);
+  } catch (err) {
+    console.warn('saveQuizAttempt warning:', err);
+  }
+}
+
+// ============================================================
+// Live Quiz Session helpers (client-side Firestore reads)
+// ============================================================
+
+export interface LiveQuizSession {
+  sessionId: string;
+  status: 'waiting' | 'active' | 'finished';
+  createdAt: any;
+  startedAt: any;
+  timerDurationSeconds: number;
+  timerEndsAt: any;
+  adminPasscode: string;
+  totalQuestions: number;
+}
+
+export interface LiveParticipant {
+  participantId: string;
+  displayName: string;
+  domainSlug: string;
+  joinedAt: any;
+  score: number;
+  totalCorrect: number;
+  totalAnswered: number;
+  completedAt: any;
+}
+
+export interface LeaderboardEntry {
+  participantId: string;
+  displayName: string;
+  domainSlug: string;
+  score: number;
+  totalCorrect: number;
+  completedAt: any;
+}
+
+/**
+ * Subscribe to a live quiz session document for real-time updates
+ */
+export function subscribeToSession(
+  sessionId: string,
+  callback: (session: LiveQuizSession | null) => void
+) {
+  const docRef = doc(db, 'quizSessions', sessionId);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ sessionId, ...snap.data() } as LiveQuizSession);
+      } else {
+        callback(null);
+      }
+    },
+    (err) => {
+      console.warn('subscribeToSession error:', err);
+      callback(null);
+    }
+  );
+}
+
+/**
+ * Subscribe to the leaderboard subcollection for real-time updates
+ */
+export function subscribeToLeaderboard(
+  sessionId: string,
+  callback: (entries: LeaderboardEntry[]) => void
+) {
+  const colRef = collection(db, 'quizSessions', sessionId, 'leaderboard');
+  const q = query(colRef, orderBy('score', 'desc'), limit(50));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const entries = snap.docs.map((d) => ({
+        participantId: d.id,
+        ...d.data(),
+      })) as LeaderboardEntry[];
+      callback(entries);
+    },
+    (err) => {
+      console.warn('subscribeToLeaderboard error:', err);
+      callback([]);
+    }
+  );
+}
+
+/**
+ * Subscribe to participants subcollection
+ */
+export function subscribeToParticipants(
+  sessionId: string,
+  callback: (participants: LiveParticipant[]) => void
+) {
+  const colRef = collection(db, 'quizSessions', sessionId, 'participants');
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const list = snap.docs.map((d) => ({
+        participantId: d.id,
+        ...d.data(),
+      })) as LiveParticipant[];
+      callback(list);
+    },
+    (err) => {
+      console.warn('subscribeToParticipants error:', err);
+      callback([]);
+    }
+  );
 }

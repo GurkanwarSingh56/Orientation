@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Sparkles, Zap } from 'lucide-react';
 import { DOMAIN_ITEMS, FEATURED_DOMAIN, DomainItem } from '@/lib/data/domain-data';
+import Link from 'next/link';
 import DomainModal from '@/components/DomainModal';
 
 export interface ExploreTechnologyProps {
@@ -79,14 +80,24 @@ export default function ExploreTechnology({ activeCategoryFilter, onSelectCatego
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => handleOpenDomainModal(FEATURED_DOMAIN)}
-              className="mt-4 w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity"
-            >
-              <span>Explore AI & AI Agents</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => handleOpenDomainModal(FEATURED_DOMAIN)}
+                className="w-full py-3 rounded-2xl bg-white/5 text-white font-bold text-xs flex items-center justify-center space-x-2 border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <span>Explore AI & AI Agents</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              
+              <Link
+                href={`/live-quiz?topic=${FEATURED_DOMAIN.quizSlug}`}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity"
+              >
+                <span>Take Quiz</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
 
           {/* 7 Supporting Categories Grid (Spans 7 cols on lg) */}
@@ -119,14 +130,23 @@ export default function ExploreTechnology({ activeCategoryFilter, onSelectCatego
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDomainModal(cat)}
-                    className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 pt-2 border-t border-white/10 text-left w-full cursor-pointer"
-                  >
-                    <span>Explore Domain</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDomainModal(cat)}
+                      className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      <span>Explore Domain</span>
+                      <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    </button>
+                    
+                    <Link
+                      href={`/live-quiz?topic=${cat.quizSlug}`}
+                      className="inline-flex items-center space-x-1 text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <span>Take Quiz</span>
+                    </Link>
+                  </div>
                 </div>
               );
             })}

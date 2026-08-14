@@ -1,27 +1,6 @@
 {
   "rules": {
-    "liveQuiz": {
-      "$sessionId": {
-        ".read": true,
-        ".write": true,
-        "status": {
-          ".write": true
-        },
-        "currentQuestion": {
-          ".write": true
-        },
-        "questionStartedAt": {
-          ".write": true
-        },
-        "leaderboard": {
-          ".write": true
-        },
-        "participants": {
-          "$participantId": {
-            ".write": true
-          }
-        }
-      }
-    }
+    ".read": false,
+    ".write": false
   }
 }

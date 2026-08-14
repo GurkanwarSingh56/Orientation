@@ -48,5 +48,24 @@ service cloud.firestore {
       allow create, update: if isOwner(participantId);
       allow delete: if isAdmin();
     }
+
+    // 6. Live Quiz Sessions
+    // Clients only read session data. All creates/updates/submissions go through secure API routes using Admin SDK.
+    match /quizSessions/{sessionId} {
+      allow read: if true;
+      allow write: if false; // Only Admin SDK (server) can write
+      
+      // Subcollections
+      match /leaderboard/{participantId} {
+        allow read: if true;
+        allow write: if false; // Only Admin SDK
+      }
+      
+      match /participants/{participantId} {
+        // Participants can read their own detailed doc to restore state, or public can read it if needed.
+        allow read: if true;
+        allow write: if false; // Only Admin SDK processes answers
+      }
+    }
   }
 }

@@ -48,3 +48,40 @@ export interface QuizEvaluationResult {
     explanation: string;
   }[];
 }
+
+// ============================================================
+// Live Quiz Session Types
+// ============================================================
+
+export type SessionStatus = 'waiting' | 'active' | 'finished';
+
+export interface LiveSessionData {
+  sessionId: string;
+  status: SessionStatus;
+  createdAt: string;
+  startedAt: string | null;
+  timerDurationSeconds: number;
+  timerEndsAt: string | null;
+  totalQuestions: number;
+}
+
+export interface ParticipantData {
+  participantId: string;
+  displayName: string;
+  domainSlug: DomainSlug;
+  joinedAt: string;
+  answers: Record<string, { selected: number; answeredAt: string }>;
+  score: number;
+  totalCorrect: number;
+  totalAnswered: number;
+  completedAt: string | null;
+}
+
+export interface LeaderboardEntryData {
+  participantId: string;
+  displayName: string;
+  domainSlug: DomainSlug;
+  score: number;
+  totalCorrect: number;
+  completedAt: string | null;
+}

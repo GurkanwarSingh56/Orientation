@@ -1,435 +1,633 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Zap, CheckCircle2, Clock, Award, Loader2, Play, Pause } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShieldAlert, Globe, Code2, Database, Cloud, Rocket, GitBranch, ArrowRight, Loader2, Clock, CheckCircle2, Trophy, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { signInAnonymouslyUser } from '@/lib/firebase/auth';
-import { joinLiveQuizSessionWithPresence, subscribeToLiveQuiz, LiveQuizState } from '@/lib/firebase/rtdb';
-import { ALL_QUIZ_QUESTIONS } from '@/lib/data/quiz-questions';
+import { subscribeToSession, subscribeToLeaderboard, LiveQuizSession, LeaderboardEntry } from '@/lib/firebase/firestore';
+import { DOMAIN_ITEMS } from '@/lib/data/domain-data';
+import { ClientQuizQuestion, DomainSlug } from '@/lib/types/quiz';
 
-export default function LiveQuizStudentPage() {
-  const [name, setName] = useState('');
-  const [roomCode, setRoomCode] = useState('TV26');
-  const [joined, setJoined] = useState(false);
+type QuizStep = 'join' | 'topic' | 'waiting' | 'active' | 'result' | 'ended';
+
+export default function LiveQuizPage() {
+  const router = useRouter();
+
+  // State
+  const [step, setStep] = useState<QuizStep>('join');
+  const [roomCode, setRoomCode] = useState('technovate2026');
+  const [displayName, setDisplayName] = useState('');
   const [participantId, setParticipantId] = useState('');
-  const [liveState, setLiveState] = useState<LiveQuizState | null>(null);
-
+  const [selectedTopic, setSelectedTopic] = useState<DomainSlug | null>(null);
+  
+  const [session, setSession] = useState<LiveQuizSession | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  
+  const [questions, setQuestions] = useState<ClientQuizQuestion[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [submittedForQuestion, setSubmittedForQuestion] = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [localTimer, setLocalTimer] = useState<number>(30);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [timeLeft, setTimeLeft] = useState<string>('--:--');
 
-  // Auto-restore saved name on mount
-  useEffect(() => {
-    const savedName = localStorage.getItem('technovate_student_name');
-    if (savedName) {
-      setName(savedName);
-    }
-  }, []);
+  const [resultData, setResultData] = useState<{ score: number; totalCorrect: number; totalAnswered: number } | null>(null);
 
-  // Handle joining live session
-  const handleJoinSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !roomCode.trim()) return;
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isSubmittingRef = useRef(false);
 
-    setErrorMsg(null);
-    setIsSubmitting(true);
+  // Finish Quiz
+  const handleFinishQuiz = React.useCallback(async (sid: string, pid: string) => {
+    if (isSubmittingRef.current && step === 'result') return;
+    isSubmittingRef.current = true;
+    setLoading(true);
     
-    // Check global state first to prevent late joining
     try {
-      const targetSessionId = roomCode.trim().toUpperCase();
-      const stateRes = await fetch(`/api/live-quiz/state?sessionId=${targetSessionId}`);
-      if (stateRes.ok) {
-        const json = await stateRes.json();
-        if (json.data && json.data.status !== 'LOBBY') {
-          setErrorMsg('TEST ALREADY STARTED. You cannot join this live quiz.');
-          setIsSubmitting(false);
-          return;
+      const res = await fetch('/api/quiz/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'finish',
+          sessionId: sid,
+          participantId: pid,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setResultData({
+          score: data.score,
+          totalCorrect: data.totalCorrect,
+          totalAnswered: data.totalAnswered || 10
+        });
+        setStep('result');
+      } else {
+        // If it fails, we might already be finished
+        if (data.error === 'Participant not found') {
+          setError('Could not finalize quiz.');
+        } else {
+          setStep('result');
         }
       }
     } catch (err) {
-      // Ignore network errors here and proceed
-    }
-
-    localStorage.setItem('technovate_student_name', name.trim());
-
-    // INSTANT UI TRANSITION to Lobby Screen
-    setJoined(true);
-
-    const targetSessionId = roomCode.trim().toUpperCase();
-
-    try {
-      const user = await signInAnonymouslyUser();
-      const pId = user?.uid || 'usr_' + Math.random().toString(36).substring(2, 9);
-      setParticipantId(pId);
-
-      // Register participant via REST API
-      await fetch('/api/live-quiz/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: targetSessionId,
-          participantId: pId,
-          displayName: name.trim(),
-        }),
-      }).catch((err) => console.warn('Background join fetch warning:', err));
-
-      // Establish client presence listener (non-blocking)
-      joinLiveQuizSessionWithPresence(targetSessionId, pId, name.trim()).catch((presenceErr) => {
-        console.warn('Client presence fallback warning:', presenceErr);
-      });
-    } catch (err: any) {
-      console.warn('Background auth/join warning:', err);
+      console.error('Finish error', err);
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
+      isSubmittingRef.current = false;
     }
-  };
+  }, [step]);
 
-  // Subscribe to live quiz state updates when joined + REST polling fallback
+  // Restore session from local storage and URL params on mount
   useEffect(() => {
-    if (!joined || !roomCode) return;
+    const savedRoom = localStorage.getItem('technovate_live_room');
+    const savedName = localStorage.getItem('technovate_live_name');
+    if (savedRoom) setRoomCode(savedRoom);
+    if (savedName) setDisplayName(savedName);
 
-    const targetSessionId = roomCode.trim().toUpperCase();
-
-    // Socket subscription
-    const unsubscribe = subscribeToLiveQuiz(targetSessionId, (data) => {
-      if (data) setLiveState(data);
-    });
-
-    // REST Polling fallback every 1.5s
-    const fetchLatestState = async () => {
-      try {
-        const res = await fetch(`/api/live-quiz/state?sessionId=${targetSessionId}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data) {
-            setLiveState(json.data);
-          }
-        }
-      } catch (err) {
-        console.warn('Student REST state poll error:', err);
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const topicParam = urlParams.get('topic');
+      if (topicParam) {
+        setSelectedTopic(topicParam as DomainSlug);
       }
-    };
+    }
+  }, []);
 
-    fetchLatestState();
-    const interval = setInterval(fetchLatestState, 1500);
+  // Listen to session changes once joined
+  useEffect(() => {
+    if (!roomCode || step === 'join' || step === 'topic') return;
+    
+    const unsubscribe = subscribeToSession(roomCode, (sess) => {
+      if (!sess) {
+        if (step !== 'waiting') {
+          setError('Session not found or ended.');
+        }
+        return;
+      }
+      setSession(sess);
+      setError('');
+      
+      // Auto-transitions based on session status
+      if (sess.status === 'active' && step === 'waiting') {
+        setStep('active');
+      } else if (sess.status === 'finished' && step !== 'result') {
+        handleFinishQuiz(roomCode, participantId);
+      }
+    });
+    
+    const unsubLeaderboard = subscribeToLeaderboard(roomCode, (entries) => {
+      setLeaderboard(entries);
+    });
 
     return () => {
       unsubscribe();
-      clearInterval(interval);
+      unsubLeaderboard();
     };
-  }, [joined, roomCode]);
+  }, [roomCode, step, participantId, handleFinishQuiz]);
 
-  // Synchronize timer precisely from Firebase state
+  // Global Timer logic
   useEffect(() => {
-    if (!liveState) return;
+    if (session?.status === 'active' && session.timerEndsAt && step === 'active') {
+      timerRef.current = setInterval(() => {
+        const endsAt = new Date(session.timerEndsAt).getTime();
+        const now = new Date().getTime();
+        const diff = endsAt - now;
 
-    if (liveState.status === 'PAUSED' || liveState.status === 'FINISHED' || liveState.status === 'LOBBY') {
-      setLocalTimer(liveState.remainingTime || 0);
+        if (diff <= 0) {
+          setTimeLeft('00:00');
+          if (timerRef.current) clearInterval(timerRef.current);
+          handleFinishQuiz(session.sessionId, participantId);
+        } else {
+          const m = Math.floor(diff / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          setTimeLeft(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [session, step, participantId, handleFinishQuiz]);
+
+  // Fallback Polling for 'waiting' state to ensure robust transition
+  useEffect(() => {
+    if (step !== 'waiting' || !roomCode) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/quiz/session?sessionId=${roomCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'active') {
+             setStep('active');
+          } else if (data.status === 'finished') {
+             handleFinishQuiz(roomCode, participantId);
+          }
+        }
+      } catch (err) {
+        // silently ignore polling errors
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [step, roomCode, participantId, handleFinishQuiz]);
+
+  // Step 1: Join / Reconnect
+  const handleJoinInit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    const code = 'technovate2026';
+    const name = displayName.trim();
+    if (!name) {
+      setError('Name is required.');
+      return;
+    }
+    if (name.length > 30) {
+      setError('Name is too long.');
       return;
     }
 
-    if (liveState.status === 'RUNNING' && liveState.questionStartedAt) {
-      const duration = liveState.questionDuration || 30;
-      const timerInterval = setInterval(() => {
-        const elapsedSec = Math.floor((Date.now() - (liveState.questionStartedAt || Date.now())) / 1000);
-        const remaining = Math.max(0, duration - elapsedSec);
-        setLocalTimer(remaining);
-      }, 500);
-      return () => clearInterval(timerInterval);
-    }
-  }, [liveState]);
-
-  // Reset selected option when host advances question
-  useEffect(() => {
-    setSelectedOption(null);
-  }, [liveState?.currentQuestion]);
-
-  // Handle submitting answer to server evaluation API
-  const handleSubmitAnswer = async (optionIdx: number) => {
-    if (isSubmitting || !liveState || !participantId || liveState.status !== 'RUNNING') return;
-    setSelectedOption(optionIdx);
-    setIsSubmitting(true);
-
-    const currentQ = ALL_QUIZ_QUESTIONS[liveState.currentQuestion || 0];
-
+    setLoading(true);
     try {
-      const res = await fetch('/api/live-quiz/submit', {
+      const authResult = await signInAnonymouslyUser();
+      const pId = authResult.uid;
+      setParticipantId(pId);
+      setRoomCode(code);
+      setDisplayName(name);
+
+      localStorage.setItem('technovate_live_room', code);
+      localStorage.setItem('technovate_live_name', name);
+
+      // Check session via API
+      const res = await fetch(`/api/quiz/session?sessionId=${code}`);
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Failed to find session');
+      if (data.status === 'finished') {
+        setStep('ended');
+        return;
+      }
+
+      // Check if participant already joined by calling the submit API with 'join'
+      // We pass a dummy domainSlug just in case they haven't joined, but if they haven't, it will error without it.
+      // Wait, we need to know if they already joined BEFORE asking for topic.
+      // Let's just go to topic selection, and the API will handle alreadyJoined.
+      // Actually, if we send a join request with empty domain, the backend might reject it.
+      // Let's go to topic selection first. The topic selection will call join.
+      
+      setStep('topic');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Join Session with Topic
+  const handleJoinWithTopic = async () => {
+    if (!selectedTopic) {
+      setError('Please select a topic.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    
+    try {
+      const res = await fetch('/api/quiz/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: roomCode.trim().toUpperCase(),
+          action: 'join',
+          sessionId: roomCode,
           participantId,
-          questionId: currentQ.id,
-          selectedOption: optionIdx,
+          displayName,
+          domainSlug: selectedTopic,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Answer submission failed');
+        if (data.error === 'Session has ended') {
+          setStep('ended');
+          return;
+        }
+        throw new Error(data.error || 'Failed to join');
       }
 
-      setSubmittedForQuestion(liveState.currentQuestion || 0);
+      if (data.alreadyJoined) {
+        // Restore state
+        setSelectedTopic(data.domainSlug);
+        if (data.completedAt) {
+          await handleFinishQuiz(roomCode, participantId); // Fetch result
+          return;
+        }
+      }
+
+      setQuestions(data.questions || []);
+      
+      if (data.sessionStatus === 'waiting') {
+        setStep('waiting');
+      } else if (data.sessionStatus === 'active') {
+        setStep('active');
+        
+        // Skip answered questions
+        if (data.alreadyJoined && data.totalAnswered > 0) {
+           setCurrentQuestionIndex(Math.min(data.totalAnswered, 9));
+        }
+      } else {
+        throw new Error('Session is in an invalid state.');
+      }
     } catch (err: any) {
-      console.error('Answer submission error:', err);
+      setError(err.message || 'Error joining quiz.');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  // Count online participants
-  const participantsList = liveState?.participants ? Object.values(liveState.participants) : [];
-  const currentQ = ALL_QUIZ_QUESTIONS[liveState?.currentQuestion || 0];
-  const totalQuestions = ALL_QUIZ_QUESTIONS.length;
-  const status = liveState?.status || 'LOBBY';
+  // Step 4: Submit Answer
+  const handleAnswerSubmit = async () => {
+    if (selectedOption === null) return;
+    if (isSubmittingRef.current) return;
+    
+    const currentQ = questions[currentQuestionIndex];
+    if (!currentQ) return;
 
-  // Compute My Final Score for Results Screen
-  const myData = liveState?.participants ? liveState.participants[participantId] : null;
-  const myScore = myData?.currentScore || 0;
-  const myPercentage = ((myScore / totalQuestions) * 100).toFixed(2);
+    isSubmittingRef.current = true;
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/quiz/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit-answer',
+          sessionId: roomCode,
+          participantId,
+          questionId: currentQ.id,
+          selectedOption,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.alreadyAnswered) {
+          // It's ok, just move forward
+        } else {
+          throw new Error(data.error || 'Failed to submit answer');
+        }
+      }
+
+      // Record locally
+      setAnswers((prev) => ({ ...prev, [currentQ.id]: selectedOption }));
+      setSelectedOption(null);
+
+      // Advance or finish
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex((prev) => prev + 1);
+      } else {
+        await handleFinishQuiz(roomCode, participantId);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error submitting answer. Please try again.');
+    } finally {
+      setLoading(false);
+      isSubmittingRef.current = false;
+    }
+  };
+
+
+  // --- RENDER HELPERS ---
+  const myRank = leaderboard.findIndex((l) => l.participantId === participantId) + 1;
 
   return (
-    <main className="bg-[#050814] min-h-screen text-white flex flex-col justify-between selection:bg-cyan-400 selection:text-black">
+    <main className="bg-[#050814] min-h-screen text-white flex flex-col selection:bg-cyan-400 selection:text-black">
       <Navbar />
-
-      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto w-full">
-        {/* Top Back Nav */}
-        <div className="mb-6 flex items-center justify-between">
-          <Link
-            href="/#explore"
-            className="inline-flex items-center space-x-2 text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Explorer</span>
-          </Link>
-          <span className="text-xs font-mono text-gray-400 flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-cyan-400" />
-            REALTIME QUIZ MODE
-          </span>
-        </div>
-
-        {/* 1. JOIN VIEW */}
-        {!joined ? (
-          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0D152D] via-[#111A38] to-[#0D152D] border border-cyan-500/30 shadow-2xl space-y-6 relative overflow-hidden">
-            <div className="flex items-center space-x-3.5">
-              <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-                <Users className="w-7 h-7" />
-              </div>
-              <div>
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 block mb-0.5">
-                  Interactive Classroom
-                </span>
-                <h1 className="text-2xl font-extrabold text-white">TECHNOVATE LIVE QUIZ</h1>
-              </div>
+      
+      <div className="flex-1 max-w-3xl mx-auto w-full px-4 pt-28 pb-16">
+        
+        {/* STEP 1: JOIN */}
+        {step === 'join' && (
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl animate-fadeInUp">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-500 mb-2">
+                Join Live Quiz
+              </h1>
             </div>
 
-            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
-              Join your club live quiz session in real-time. Enter your display name and room code provided by your host.
-            </p>
-
-            {errorMsg && (
-              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                {errorMsg}
-              </div>
-            )}
-
-            <form onSubmit={handleJoinSession} className="space-y-4">
+            <form onSubmit={handleJoinInit} className="space-y-5">
               <div>
-                <label className="text-xs font-mono text-gray-300 block mb-1.5">Enter your name</label>
+                <label className="block text-xs font-mono text-cyan-400 mb-2 ml-1">YOUR NAME</label>
                 <input
                   type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Enter your full name"
+                  maxLength={30}
+                  className="w-full bg-[#0a0f1c] border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder:text-gray-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Gurkanwar"
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400 transition-all placeholder:text-gray-500"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-mono text-gray-300 block mb-1.5">Enter room code</label>
-                <input
-                  type="text"
-                  required
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="TV26"
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-mono tracking-widest focus:outline-none focus:border-cyan-400 transition-all placeholder:text-gray-500"
-                />
-              </div>
+              {error && (
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all disabled:opacity-50"
+                disabled={loading || !displayName}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-sm shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <span>JOIN LIVE QUIZ</span>
-                    <Play className="w-4 h-4 fill-current" />
-                  </>
-                )}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Continue'}
+                {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
             </form>
           </div>
-        ) : (
-          /* JOINED SESSION VIEWS */
-          <div className="space-y-6">
-            {/* Header Status Card */}
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-[#0D152D] via-[#111A38] to-[#0D152D] border border-cyan-500/30 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-cyan-400 block mb-1">
-                  LIVE QUIZ • ROOM: {roomCode}
-                </span>
-                <h2 className="text-xl font-extrabold text-white">
-                  Technovate Live Competition
-                </h2>
-                <p className="text-xs text-gray-300 mt-1">
-                  Joined as <span className="text-cyan-300 font-semibold">{name}</span>
-                </p>
+        )}
+
+        {/* STEP 2: TOPIC SELECTION */}
+        {step === 'topic' && (
+          <div className="animate-fadeInUp">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">
+                Choose Your Topic
+              </h1>
+              <p className="text-gray-400 text-sm">Select the technology domain you want to be tested on. (10 Questions)</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+              {DOMAIN_ITEMS.map((domain) => {
+                const isSelected = selectedTopic === domain.quizSlug;
+                const Icon = domain.icon;
+                return (
+                  <button
+                    key={domain.id}
+                    onClick={() => setSelectedTopic(domain.quizSlug as DomainSlug)}
+                    className={`flex items-start gap-4 p-4 rounded-2xl border text-left transition-all duration-200 ${
+                      isSelected 
+                        ? 'bg-cyan-500/10 border-cyan-500 text-white shadow-lg shadow-cyan-500/10' 
+                        : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className={`p-2.5 rounded-xl shrink-0 ${isSelected ? 'bg-cyan-500/20 text-cyan-400' : 'bg-white/5 text-gray-400'}`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                        {domain.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">10 Questions</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="p-3 mb-6 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs text-center">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleJoinWithTopic}
+              disabled={loading || !selectedTopic}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-sm shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Start Quiz'}
+            </button>
+          </div>
+        )}
+
+        {/* STEP 3: WAITING */}
+        {step === 'waiting' && (
+          <div className="flex flex-col items-center justify-center text-center py-20 animate-fadeInUp">
+            <div className="w-20 h-20 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center mb-6 relative">
+              <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+              <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-xl animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Waiting to Start...</h2>
+            <p className="text-gray-400 text-sm max-w-sm mx-auto">
+              You're in! The quiz will begin automatically as soon as the organizer starts the session.
+            </p>
+            <div className="mt-8 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400">
+              TOPIC: {selectedTopic}
+            </div>
+          </div>
+        )}
+
+        {/* STEP 4: ACTIVE QUIZ */}
+        {step === 'active' && questions.length > 0 && (
+          <div className="animate-fadeInUp space-y-6">
+            
+            {/* Header: Progress & Timer */}
+            <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-2xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm border border-cyan-500/30">
+                  {currentQuestionIndex + 1}
+                </div>
+                <div>
+                  <div className="text-xs text-gray-400 font-mono">QUESTION {currentQuestionIndex + 1} OF {questions.length}</div>
+                  <div className="text-sm font-bold text-white capitalize">{selectedTopic?.replace('-', ' ')}</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-lg text-rose-400">
+                <Clock className="w-4 h-4" />
+                <span className="font-mono font-bold text-sm tracking-wider">{timeLeft}</span>
               </div>
             </div>
 
-            {/* 2. LOBBY VIEW */}
-            {status === 'LOBBY' && (
-              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6 text-center">
-                <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mx-auto flex items-center justify-center">
-                  <Clock className="w-6 h-6 animate-spin" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-1">Waiting for host to start...</h3>
-                  <p className="text-xs text-gray-400">
-                    Get ready! The host will start the {totalQuestions} questions shortly.
-                  </p>
-                </div>
+            {/* Progress Bar */}
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-400 to-violet-500 transition-all duration-300 ease-out"
+                style={{ width: `${((currentQuestionIndex) / questions.length) * 100}%` }}
+              />
+            </div>
 
-                {/* Participant Roster */}
-                <div className="pt-4 border-t border-white/10 text-left">
-                  <h4 className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-cyan-400" />
-                    Connected Participants ({participantsList.length})
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-2">
-                    {participantsList.map((p) => (
-                      <div
-                        key={p.participantId}
-                        className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center space-x-2 text-xs"
-                      >
-                        <span className={`w-2 h-2 rounded-full ${p.online ? 'bg-emerald-400' : 'bg-gray-500'}`} />
-                        <span className="text-gray-200 truncate">{p.displayName}</span>
+            {/* Question Card */}
+            <div className="bg-gradient-to-br from-[#0d1526] to-[#0a0f1c] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl">
+              <h2 className="text-lg sm:text-xl font-bold text-white mb-6 leading-relaxed">
+                {questions[currentQuestionIndex].question}
+              </h2>
+              
+              <div className="space-y-3">
+                {questions[currentQuestionIndex].options.map((opt, idx) => {
+                  const isSelected = selectedOption === idx;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedOption(idx)}
+                      className={`w-full text-left p-4 rounded-xl border transition-all flex items-center gap-4 group ${
+                        isSelected 
+                          ? 'bg-cyan-500/20 border-cyan-500 text-white' 
+                          : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        isSelected ? 'border-cyan-400' : 'border-gray-500 group-hover:border-gray-400'
+                      }`}>
+                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                      <span className="text-sm">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs text-center">
+                {error}
               </div>
             )}
 
-            {/* 3. ACTIVE QUIZ QUESTION VIEW */}
-            {status === 'RUNNING' && currentQ && (
-              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-white/10 shadow-xl space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                  <span className="text-xs font-mono font-bold text-cyan-400">
-                    Question {(liveState?.currentQuestion || 0) + 1} of {totalQuestions}
-                  </span>
-                  <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" />
-                    {localTimer}s remaining
-                  </span>
-                </div>
-
-                <h3 className="text-lg font-bold text-white leading-relaxed">
-                  {currentQ.question}
-                </h3>
-
-                {/* 4 Options */}
-                <div className="space-y-3 pt-2">
-                  {currentQ.options.map((opt, optIdx) => {
-                    const isSelected = selectedOption === optIdx;
-                    let optionStyle = 'bg-white/5 border-white/10 hover:border-cyan-500/40 text-gray-200';
-                    if (isSelected) {
-                      optionStyle = 'bg-cyan-500/20 border-cyan-500/60 text-cyan-200 font-semibold shadow-glow';
-                    }
-
-                    return (
-                      <button
-                        key={optIdx}
-                        onClick={() => handleSubmitAnswer(optIdx)}
-                        disabled={isSubmitting || submittedForQuestion === (liveState?.currentQuestion || 0)}
-                        className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex items-center justify-between ${optionStyle}`}
-                      >
-                        <div className="flex items-center space-x-3.5">
-                          <span className="w-7 h-7 rounded-lg bg-white/10 text-cyan-300 font-mono text-xs flex items-center justify-center font-bold">
-                            {String.fromCharCode(65 + optIdx)}
-                          </span>
-                          <span>{opt}</span>
-                        </div>
-                        {isSelected && <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {submittedForQuestion === (liveState?.currentQuestion || 0) && (
-                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Answer submitted! Waiting for host to reveal next question...</span>
-                  </div>
+            {/* Actions */}
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={handleAnswerSubmit}
+                disabled={selectedOption === null || loading}
+                className="px-8 py-3.5 rounded-xl bg-cyan-500 text-[#050814] font-bold text-sm shadow-lg hover:bg-cyan-400 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  currentQuestionIndex === questions.length - 1 ? 'Submit Quiz' : 'Next'
                 )}
-              </div>
-            )}
-
-            {/* 4. PAUSED QUIZ VIEW */}
-            {status === 'PAUSED' && (
-              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-amber-500/30 shadow-xl space-y-6 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 mx-auto flex items-center justify-center">
-                  <Pause className="w-8 h-8 fill-current" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-extrabold text-white">QUIZ PAUSED</h3>
-                  <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">
-                    The host has temporarily paused the quiz. Please wait until the host resumes the session.
-                  </p>
-                </div>
-                <div className="text-xs font-mono text-amber-500 pt-4 border-t border-amber-500/20">
-                  Question {(liveState?.currentQuestion || 0) + 1} / {totalQuestions}
-                </div>
-              </div>
-            )}
-
-            {/* 5. QUIZ FINISHED VIEW */}
-            {status === 'FINISHED' && (
-              <div className="p-6 sm:p-8 rounded-2xl bg-[#0B1124] border border-emerald-500/30 shadow-xl space-y-6 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center">
-                  <Award className="w-10 h-10" />
-                </div>
-                <div>
-                  <h3 className="text-3xl font-extrabold text-white tracking-wide">🏆 QUIZ COMPLETED</h3>
-                  <p className="text-sm text-gray-400 mt-2">
-                    The live competition has concluded!
-                  </p>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-                  <p className="text-xs font-mono text-gray-400 uppercase tracking-widest">Your Final Score</p>
-                  <p className="text-4xl font-extrabold text-white">
-                    {myScore} <span className="text-lg text-gray-400 font-medium">/ {totalQuestions}</span>
-                  </p>
-                  <p className="text-sm font-bold text-emerald-400 pt-1">
-                    {myPercentage}% Accuracy
-                  </p>
-                </div>
-              </div>
-            )}
+                {!loading && <ArrowRight className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         )}
-      </div>
 
+        {/* STEP 5: RESULT */}
+        {step === 'result' && resultData && (
+          <div className="animate-fadeInUp space-y-6">
+            <div className="bg-gradient-to-br from-[#0d1526] to-[#0a0f1c] border border-cyan-500/30 rounded-3xl p-8 sm:p-10 text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-violet-500 text-white mb-6 shadow-lg shadow-cyan-500/20">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              
+              <h1 className="text-3xl font-extrabold text-white mb-2">Quiz Completed! 🎉</h1>
+              <p className="text-gray-400 text-sm mb-8">
+                Your results have been securely recorded and added to the live leaderboard.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider mb-1">Score</div>
+                  <div className="text-3xl font-bold text-cyan-400">{resultData.score}</div>
+                </div>
+                
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider mb-1">Accuracy</div>
+                  <div className="text-3xl font-bold text-violet-400">
+                    {Math.round((resultData.totalCorrect / resultData.totalAnswered) * 100)}%
+                  </div>
+                </div>
+                
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 col-span-2 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">Live Rank</div>
+                      <div className="text-sm font-semibold text-gray-200">Across all topics</div>
+                    </div>
+                  </div>
+                  <div className="text-3xl font-bold text-amber-400">
+                    {myRank > 0 ? `#${myRank}` : '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center pt-4">
+              <Link
+                href="/#explore"
+                className="px-6 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-gray-300 font-semibold text-sm transition-all flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Return to Home
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 6: ENDED */}
+        {step === 'ended' && (
+          <div className="flex flex-col items-center justify-center text-center py-20 animate-fadeInUp">
+            <div className="w-20 h-20 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-6">
+              <Clock className="w-8 h-8 text-rose-400" />
+            </div>
+            <h2 className="text-3xl font-extrabold text-white mb-4">Quiz has ended</h2>
+            <p className="text-gray-400 text-sm max-w-sm mx-auto mb-8">
+              The global timer for this quiz session has expired. No new attempts are being accepted.
+            </p>
+            <Link
+              href="/#explore"
+              className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-gray-300 font-semibold text-sm transition-all flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Return to Home
+            </Link>
+          </div>
+        )}
+        
+      </div>
+      
       <Footer />
     </main>
   );
