@@ -97,7 +97,7 @@ export default function AdminQuizDashboard() {
         totalQuestions: 10,
         createdAt: prev?.createdAt || new Date(),
         startedAt: prev?.startedAt || new Date(),
-        timerDurationSeconds: prev?.timerDurationSeconds || 900
+        timerDurationSeconds: prev?.timerDurationSeconds || 3600
       } as LiveQuizSession));
 
     } catch (err) {

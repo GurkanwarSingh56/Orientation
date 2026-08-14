@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const duration = timerDurationSeconds || (data?.timerDurationSeconds) || 600;
+      const duration = timerDurationSeconds || 3600;
       const now = new Date();
       const endsAt = new Date(now.getTime() + duration * 1000);
 
