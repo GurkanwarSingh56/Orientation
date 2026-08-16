@@ -25,11 +25,10 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
           ? 'bg-[#050814]/90 backdrop-blur-xl border-b border-cyan-500/20 shadow-xl shadow-black/50 py-3'
           : 'bg-gradient-to-b from-[#050814]/90 to-transparent py-4'
-      }`}
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
@@ -68,7 +67,7 @@ export default function Navbar() {
           {/* Right: Join Technovate Button */}
           <div className="hidden md:flex items-center space-x-3">
             <a
-              href="https://docs.google.com/forms/d/e/1FAIpQLSfuzvlLSI34YJvl5Lb4ZJciSWZeUR1wfjwgug_E8bUvHKhSjA/viewform?usp=publish-editor"
+              href="https://forms.gle/YPsoWadrnimtFHpn6"
               target="_blank"
               rel="noopener noreferrer"
               className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 via-violet-600 to-pink-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all flex items-center space-x-1.5"
