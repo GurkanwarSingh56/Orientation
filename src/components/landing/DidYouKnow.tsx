@@ -10,7 +10,7 @@ export const TRIVIA_FACTS = [
     statLabel: 'Launch Year',
     text: 'Voyager 1 was launched in 1977 and went on to become one of humanity\'s most distant spacecraft.',
     question: 'How is it still communicating with Earth across 24 billion kilometers?',
-    storyLink: '#today',
+    storyLink: 'https://en.wikipedia.org/wiki/Voyager_1',
   },
   {
     id: 'first-bug',
@@ -18,7 +18,7 @@ export const TRIVIA_FACTS = [
     statLabel: 'First Moth Bug',
     text: 'Grace Hopper recorded the first actual computer bug when a real moth got trapped in Relay #70 of the Harvard Mark II.',
     question: 'Why do software engineers still call code defects "bugs" today?',
-    storyLink: '#topics',
+    storyLink: 'https://en.wikipedia.org/wiki/Software_bug#Etymology',
   },
   {
     id: 'supercomputers',
@@ -26,7 +26,7 @@ export const TRIVIA_FACTS = [
     statLabel: 'Linux Powered',
     text: 'Every single one of the world\'s top 500 fastest supercomputers runs on Linux operating system distributions.',
     question: 'What makes the open-source Linux kernel so dominant in supercomputing?',
-    storyLink: '#topics',
+    storyLink: 'https://en.wikipedia.org/wiki/TOP500',
   },
   {
     id: 'memory-voyager',
@@ -34,7 +34,7 @@ export const TRIVIA_FACTS = [
     statLabel: 'Total RAM',
     text: 'Voyager 1 operates its interplanetary science payload on just 68 Kilobytes of memory.',
     question: 'How do NASA engineers optimize software algorithms for extreme resource constraints?',
-    storyLink: '#today',
+    storyLink: 'https://en.wikipedia.org/wiki/Voyager_1#Computers_and_data_processing',
   },
 ];
 
@@ -99,6 +99,8 @@ export default function DidYouKnow() {
               <div className="pt-4">
                 <a
                   href={currentFact.storyLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-violet-600 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-opacity"
                 >
                   <span>Explore the story →</span>

@@ -63,7 +63,7 @@ async function handleJoin(body: any) {
   if (existingParticipant.exists) {
     const pData = existingParticipant.data()!;
     // If the participant belongs to a PREVIOUS event, we treat them as NOT joined for the current event.
-    if (pData.eventId === sessionData.eventId) {
+    if (pData.eventId === (sessionData.eventId || 'default')) {
       // Already joined — return their current state
       return NextResponse.json({
         joined: true,
@@ -155,7 +155,7 @@ async function handleSubmitAnswer(body: any) {
   const pData = participantSnap.data()!;
 
   // Validate eventId
-  if (pData.eventId !== sessionData.eventId) {
+  if (pData.eventId !== (sessionData.eventId || 'default')) {
     return NextResponse.json({ error: 'Participant not in current event' }, { status: 400 });
   }
 
@@ -235,7 +235,7 @@ async function handleFinish(body: any) {
   const pData = participantSnap.data()!;
 
   // Validate eventId
-  if (pData.eventId !== sessionData.eventId) {
+  if (pData.eventId !== (sessionData.eventId || 'default')) {
     return NextResponse.json({ error: 'Participant not in current event' }, { status: 400 });
   }
 

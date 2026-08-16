@@ -137,7 +137,9 @@ export default function FeaturedTopics({ activeCategoryFilter = 'all' }: Feature
 
             <div className="shrink-0">
               <a
-                href="#today"
+                href={`https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(dominantTopic.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-violet-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-pink-500/20 hover:opacity-90 transition-opacity"
               >
                 <span>Read Full Story</span>
@@ -178,7 +180,9 @@ export default function FeaturedTopics({ activeCategoryFilter = 'all' }: Feature
                 <div className="pt-3 border-t border-white/10 flex items-center justify-between">
                   <span className="text-[10px] font-mono text-gray-400">{topic.difficulty}</span>
                   <a
-                    href="#roadmaps"
+                    href={`https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(topic.title)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300"
                   >
                     <span>Read Explanation</span>

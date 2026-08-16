@@ -10,7 +10,7 @@ export const TODAY_EDITORIAL_CARDS = [
     icon: Cpu,
     summary: 'How modern LLMs transition from text generation to taking actions via tool calling, code execution, and web API queries.',
     date: 'August 13, 2026',
-    readLink: '#topics',
+    readLink: 'https://en.wikipedia.org/wiki/Intelligent_agent',
   },
   {
     id: 'space-telemetry',
@@ -19,7 +19,7 @@ export const TODAY_EDITORIAL_CARDS = [
     icon: Rocket,
     summary: 'NASA Deep Space Network antennas capture radio signals from 24 billion km away powered by less electricity than a light bulb.',
     date: 'August 13, 2026',
-    readLink: '#topics',
+    readLink: 'https://en.wikipedia.org/wiki/Voyager_1',
   },
   {
     id: 'cybersecurity-subsea',
@@ -28,7 +28,7 @@ export const TODAY_EDITORIAL_CARDS = [
     icon: ShieldAlert,
     summary: 'Over 99% of global internet traffic travels through undersea optical fiber cables protected by cryptographic encryption.',
     date: 'August 13, 2026',
-    readLink: '#topics',
+    readLink: 'https://en.wikipedia.org/wiki/Submarine_communications_cable',
   },
   {
     id: 'devtools-git',
@@ -37,7 +37,7 @@ export const TODAY_EDITORIAL_CARDS = [
     icon: GitBranch,
     summary: 'Inside the Directed Acyclic Graph (DAG) object store that makes Git branch switching instant and conflict resolution predictable.',
     date: 'August 13, 2026',
-    readLink: '#topics',
+    readLink: 'https://en.wikipedia.org/wiki/Git',
   },
 ];
 
@@ -93,6 +93,8 @@ export default function TodayInTech() {
                   <span className="text-[10px] font-mono text-cyan-400 font-bold">Curated Briefing</span>
                   <a
                     href={item.readLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 group-hover:translate-x-1 transition-transform"
                   >
                     <span>Read →</span>

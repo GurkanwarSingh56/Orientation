@@ -92,7 +92,7 @@ export default function LearningRoadmaps() {
               <div className="pt-4 border-t border-white/10 flex items-center justify-between">
                 <span className="text-[11px] text-gray-400 font-mono">Structured Pathway</span>
                 <a
-                  href="#cta"
+                  href={`/roadmaps/${rm.id}`}
                   className="inline-flex items-center space-x-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 group-hover:translate-x-1 transition-transform"
                 >
                   <span>View Roadmap</span>
